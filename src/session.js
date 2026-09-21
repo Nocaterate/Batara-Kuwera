@@ -1,6 +1,6 @@
-const SESSION_KEY = "wealthify.session";
-const ACCOUNT_KEY = "wealthify.account";
-const PREFS_KEY = "wealthify.prefs";
+const SESSION_KEY = "batara-kuwera.session";
+const ACCOUNT_KEY = "batara-kuwera.account";
+const PREFS_KEY = "batara-kuwera.prefs";
 
 export const SESSION_TTL_MS = 48 * 60 * 60 * 1000;
 export const REMEMBER_TTL_MS = 14 * 24 * 60 * 60 * 1000;
