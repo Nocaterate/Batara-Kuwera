@@ -1,11 +1,10 @@
 const SESSION_KEY = "batara-kuwera.session";
-const ACCOUNT_KEY = "batara-kuwera.account";
 const PREFS_KEY = "batara-kuwera.prefs";
 
 export const SESSION_TTL_MS = 48 * 60 * 60 * 1000;
 export const REMEMBER_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
-const read = (key) => {
+export const readJSON = (key) => {
   try {
     const raw = window.localStorage.getItem(key);
     return raw ? JSON.parse(raw) : null;
@@ -13,7 +12,7 @@ const read = (key) => {
     return null;
   }
 };
-const write = (key, value) => {
+export const writeJSON = (key, value) => {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
 };
 const remove = (key) => {
@@ -21,7 +20,7 @@ const remove = (key) => {
 };
 
 export function readSession() {
-  const s = read(SESSION_KEY);
+  const s = readJSON(SESSION_KEY);
   if (!s) return null;
   if (typeof s.expiresAt !== "number" || s.expiresAt <= Date.now()) {
     remove(SESSION_KEY);
@@ -33,15 +32,11 @@ export function readSession() {
 export function startSession(email, remember) {
   const now = Date.now();
   const session = { email, remember: !!remember, createdAt: now, expiresAt: now + (remember ? REMEMBER_TTL_MS : SESSION_TTL_MS) };
-  write(SESSION_KEY, session);
+  writeJSON(SESSION_KEY, session);
   return session;
 }
 
 export const endSession = () => remove(SESSION_KEY);
 
-export const loadAccount = () => read(ACCOUNT_KEY);
-export const saveAccount = (account) => write(ACCOUNT_KEY, account);
-export const clearAccount = () => remove(ACCOUNT_KEY);
-
-export const loadPrefs = () => read(PREFS_KEY) || {};
-export const savePrefs = (prefs) => write(PREFS_KEY, prefs);
+export const loadPrefs = () => readJSON(PREFS_KEY) || {};
+export const savePrefs = (prefs) => writeJSON(PREFS_KEY, prefs);

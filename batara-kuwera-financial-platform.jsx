@@ -12,8 +12,9 @@ import {
 } from "recharts";
 import { LangContext, useLang, makeT, makeFmt, LANGUAGES } from "./src/i18n.js";
 import {
-  readSession, startSession, endSession, loadAccount, saveAccount, clearAccount, loadPrefs, savePrefs,
+  readSession, startSession, endSession, loadPrefs, savePrefs,
 } from "./src/session.js";
+import { registerUser, verifyLogin, userExists, loadAccount, saveAccount, deleteUser, PASSWORD_RULES } from "./src/auth.js";
 
 /* ---------------------------------------------------------------------- */
 /*  Fonts / tokens                                                         */
@@ -217,7 +218,7 @@ function computeFireProjection(p, metrics) {
 /*  Small shared UI pieces                                                 */
 /* ---------------------------------------------------------------------- */
 
-function Field({ label, value, onChange, prefix, suffix, type = "number", placeholder, T }) {
+function Field({ label, value, onChange, prefix, suffix, type = "number", placeholder, readOnly, T }) {
   const { t } = useLang();
   return (
     <label className="block">
@@ -229,10 +230,12 @@ function Field({ label, value, onChange, prefix, suffix, type = "number", placeh
           value={value}
           onChange={onChange}
           placeholder={placeholder}
+          readOnly={readOnly}
           className={cn(
             "w-full rounded-lg border px-3 py-2.5 font-data text-sm outline-none transition-colors focus:border-red-600",
             T.inputBg, T.inputBorder, T.text,
-            prefix ? "pl-9" : "", suffix ? "pr-14" : ""
+            prefix ? "pl-9" : "", suffix ? "pr-14" : "",
+            readOnly ? "cursor-not-allowed opacity-60" : ""
           )}
         />
         {suffix && <span className={cn("pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm", T.mutedText)}>{suffix}</span>}
@@ -495,12 +498,16 @@ function LoginPage({ onLogin, onGoRegister, showToast }) {
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    if (busy) return;
     if (!email.trim() || !password.trim()) { setError("Enter your email and password to continue."); return; }
     setError("");
-    onLogin(email, remember);
+    setBusy(true);
+    const failure = await onLogin(email, password, remember);
+    if (failure) { setError(failure); setBusy(false); }
   };
 
   return (
@@ -539,7 +546,7 @@ function LoginPage({ onLogin, onGoRegister, showToast }) {
             </button>
           </div>
 
-          <button type="submit" className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500">
+          <button type="submit" disabled={busy} className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-60">
             {t("Sign in")}
           </button>
         </form>
@@ -570,15 +577,20 @@ function RegisterPage({ onRegister, onGoLogin }) {
   const { t } = useLang();
   const [form, setForm] = useState({ fullName: "", email: "", password: "", confirm: "" });
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const update = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    if (busy) return;
     if (!form.fullName.trim() || !form.email.trim() || !form.password) { setError("Fill in every field to create your account."); return; }
+    if (!PASSWORD_RULES.every((r) => r.test(form.password))) { setError("Password must be at least 8 characters and include an uppercase letter, a number and a symbol."); return; }
     if (form.password !== form.confirm) { setError("Passwords don't match."); return; }
     setError("");
-    onRegister(form);
+    setBusy(true);
+    const failure = await onRegister(form);
+    if (failure) { setError(failure); setBusy(false); }
   };
 
   return (
@@ -591,11 +603,22 @@ function RegisterPage({ onRegister, onGoLogin }) {
           <Field label="Full name" type="text" value={form.fullName} onChange={update("fullName")} placeholder="Jane Doe" T={DARK_TOKENS} />
           <Field label="Email" type="email" value={form.email} onChange={update("email")} placeholder="you@email.com" T={DARK_TOKENS} />
           <Field label="Password" type="password" value={form.password} onChange={update("password")} placeholder="••••••••" T={DARK_TOKENS} />
+          <ul className="-mt-2 space-y-1">
+            {PASSWORD_RULES.map((rule) => {
+              const met = rule.test(form.password);
+              return (
+                <li key={rule.id} className={cn("flex items-center gap-2 text-xs transition-colors", met ? "text-emerald-400" : "text-zinc-500")}>
+                  {met ? <Check size={12} /> : <span className="ml-1 mr-0.5 h-1.5 w-1.5 rounded-full bg-zinc-600" />}
+                  {t(rule.label)}
+                </li>
+              );
+            })}
+          </ul>
           <Field label="Confirm password" type="password" value={form.confirm} onChange={update("confirm")} placeholder="••••••••" T={DARK_TOKENS} />
 
           {error && <div className="flex items-center gap-2 rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-400"><AlertTriangle size={13} />{t(error)}</div>}
 
-          <button type="submit" className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500">
+          <button type="submit" disabled={busy} className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-60">
             {t("Create account")}
           </button>
         </form>
@@ -1202,7 +1225,7 @@ function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setPro
         <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>{t("Account")}</h3>
         <div className="space-y-4">
           <Field label="Full name" type="text" value={profile.fullName} onChange={(e) => { const v = e.target.value; setProfile((p) => ({ ...p, fullName: v })); setUser((u) => ({ ...u, fullName: v })); }} T={T} />
-          <Field label="Email" type="email" value={user.email} onChange={(e) => setUser((u) => ({ ...u, email: e.target.value }))} T={T} />
+          <Field label="Email" type="email" value={user.email} readOnly T={T} />
           <div className="flex items-center justify-between">
             <div>
               <div className={cn("text-sm", T.text)}>{t("Two-factor authentication")}</div>
@@ -1384,14 +1407,15 @@ function ChatPage({ metrics, fireData, T }) {
 /* ---------------------------------------------------------------------- */
 
 function loadInitialState() {
-  const session = readSession();
-  const account = loadAccount() || {};
+  let session = readSession();
+  if (session && !userExists(session.email)) { endSession(); session = null; }
+  const account = (session && loadAccount(session.email)) || {};
   const prefs = loadPrefs();
   const hasProfile = !!account.hasProfile;
   return {
     session,
     page: !session ? "login" : hasProfile ? "dashboard" : "onboarding",
-    user: { fullName: "", email: "", ...(account.user || {}) },
+    user: { fullName: "", ...(account.user || {}), email: session ? session.email : "" },
     profile: { ...emptyProfile(), ...(account.profile || {}) },
     hasProfile,
     subscriptionTier: account.subscriptionTier ?? null,
@@ -1423,15 +1447,22 @@ export default function App() {
   }, [theme, lang]);
 
   useEffect(() => {
-    if (!hasProfile && !user.email && !user.fullName) clearAccount();
-    else saveAccount({ user, profile, hasProfile, subscriptionTier });
-  }, [user, profile, hasProfile, subscriptionTier]);
+    if (session) saveAccount(session.email, { user, profile, hasProfile, subscriptionTier });
+  }, [session, user, profile, hasProfile, subscriptionTier]);
+
+  const resetAccountState = () => {
+    setUser({ fullName: "", email: "" });
+    setProfile(emptyProfile());
+    setHasProfile(false);
+    setSubscriptionTier(null);
+  };
 
   useEffect(() => {
     if (!session) return undefined;
     const expire = () => {
       endSession();
       setSession(null);
+      resetAccountState();
       setPage("login");
       showToast("Your session has expired. Please sign in again.");
     };
@@ -1451,27 +1482,44 @@ export default function App() {
   }, [theme]);
   const T = effectiveTheme === "light" ? LIGHT_TOKENS : DARK_TOKENS;
 
-  // Returning users keep their saved profile and go straight to the dashboard.
-  const handleLogin = (email, remember) => {
-    setSession(startSession(email, remember));
-    setUser((u) => ({ ...u, email }));
-    if (hasProfile) {
+  // Both handlers resolve to an error message, or null on success.
+  const handleLogin = async (email, password, remember) => {
+    let result;
+    try { result = await verifyLogin(email, password); }
+    catch { return "Something went wrong. Please try again."; }
+    if (!result.ok) {
+      return result.error === "NO_ACCOUNT" ? "No account found for this email. Please register first." : "Incorrect password.";
+    }
+
+    // Returning users keep their saved profile and go straight to the dashboard.
+    const account = loadAccount(result.email) || {};
+    const fullName = account.user?.fullName || result.fullName || "";
+    setUser({ fullName, email: result.email });
+    setProfile({ ...emptyProfile(), fullName, ...(account.profile || {}) });
+    setHasProfile(!!account.hasProfile);
+    setSubscriptionTier(account.subscriptionTier ?? null);
+    setSession(startSession(result.email, remember));
+    if (account.hasProfile) {
       setPage("dashboard");
-      const first = profile.fullName ? profile.fullName.split(" ")[0] : "";
+      const first = (account.profile?.fullName || fullName).split(" ")[0];
       if (first) showToast("Welcome back, {name}.", { name: first });
       else showToast("Welcome back.");
     } else {
       setPage("onboarding");
     }
+    return null;
   };
 
-  const handleRegister = (form) => {
-    setSession(startSession(form.email, false));
-    setUser({ fullName: form.fullName, email: form.email });
-    setProfile({ ...emptyProfile(), fullName: form.fullName });
-    setHasProfile(false);
-    setSubscriptionTier(null);
-    setPage("onboarding");
+  const handleRegister = async (form) => {
+    let result;
+    try { result = await registerUser(form); }
+    catch { return "Something went wrong. Please try again."; }
+    if (!result.ok) return "An account with this email already exists. Please log in.";
+
+    // No auto sign-in: the new user logs in manually, then lands in onboarding.
+    setPage("login");
+    showToast("Account created. Please sign in to continue.");
+    return null;
   };
 
   const handleOnboardingComplete = () => {
@@ -1484,16 +1532,15 @@ export default function App() {
   const handleLogout = () => {
     endSession();
     setSession(null);
+    resetAccountState();
     setPage("login");
   };
 
   const handleDeleteAccount = () => {
+    if (session) deleteUser(session.email);
     endSession();
     setSession(null);
-    setUser({ fullName: "", email: "" });
-    setProfile(emptyProfile());
-    setHasProfile(false);
-    setSubscriptionTier(null);
+    resetAccountState();
     setPage("login");
   };
 

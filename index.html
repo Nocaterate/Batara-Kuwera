@@ -12,7 +12,7 @@
           var read = function (k) { return JSON.parse(localStorage.getItem(k) || "null") || {}; };
           var prefs = read("batara-kuwera.prefs");
           var session = read("batara-kuwera.session");
-          var account = read("batara-kuwera.account");
+          var account = (read("batara-kuwera.users")[session.email] || {}).data || {};
           var signedIn = session.expiresAt > Date.now() && account.hasProfile;
           var theme = prefs.theme === "system"
             ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
