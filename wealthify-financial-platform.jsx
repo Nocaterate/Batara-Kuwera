@@ -7,9 +7,13 @@ import {
   Sparkles, Github,
 } from "lucide-react";
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, ComposedChart, Area, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  PieChart, Pie, Cell, Sector, ResponsiveContainer, ComposedChart, Area, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
+import { LangContext, useLang, makeT, makeFmt, LANGUAGES } from "./src/i18n.js";
+import {
+  readSession, startSession, endSession, loadAccount, saveAccount, clearAccount, loadPrefs, savePrefs,
+} from "./src/session.js";
 
 /* ---------------------------------------------------------------------- */
 /*  Fonts / tokens                                                         */
@@ -40,21 +44,47 @@ const DARK_TOKENS = {
   inputBorder: "border-zinc-800",
   hoverBg: "hover:bg-zinc-800/60",
   sidebarBg: "bg-zinc-950",
+  accent: "text-red-400",
+  good: "text-emerald-400",
+  warn: "text-amber-400",
+  bad: "text-red-400",
+  dangerBorder: "border-red-900/50",
+  dangerHover: "hover:bg-red-950/30",
+  notice: "border-amber-800/40 bg-amber-950/20 text-amber-300",
+  badge: {
+    CRITICAL: "bg-red-950/50 border-red-700/50 text-red-400",
+    MEDIUM: "bg-amber-950/40 border-amber-700/40 text-amber-400",
+    OPTIMAL: "bg-emerald-950/40 border-emerald-700/40 text-emerald-400",
+  },
+  chartGrid: "#3f3f46",
 };
 
 const LIGHT_TOKENS = {
   bg: "bg-zinc-50",
   panel: "bg-white",
   panelAlt: "bg-zinc-100/60",
-  border: "border-zinc-200",
+  border: "border-zinc-300",
   cardBorder: "border-red-200",
   text: "text-zinc-900",
-  subtext: "text-zinc-500",
-  mutedText: "text-zinc-400",
+  subtext: "text-zinc-600",
+  mutedText: "text-zinc-500",
   inputBg: "bg-white",
-  inputBorder: "border-zinc-300",
+  inputBorder: "border-zinc-400",
   hoverBg: "hover:bg-zinc-100",
   sidebarBg: "bg-white",
+  accent: "text-red-700",
+  good: "text-emerald-700",
+  warn: "text-amber-700",
+  bad: "text-red-600",
+  dangerBorder: "border-red-300",
+  dangerHover: "hover:bg-red-50",
+  notice: "border-amber-300 bg-amber-50 text-amber-900",
+  badge: {
+    CRITICAL: "bg-red-50 border-red-300 text-red-700",
+    MEDIUM: "bg-amber-50 border-amber-400 text-amber-800",
+    OPTIMAL: "bg-emerald-50 border-emerald-400 text-emerald-800",
+  },
+  chartGrid: "#d4d4d8",
 };
 
 /* ---------------------------------------------------------------------- */
@@ -132,7 +162,6 @@ function formatCurrency(value) {
 }
 
 function formatPrice(price) {
-  if (price === 0) return "Free";
   return "Rp" + Math.round(price).toLocaleString("id-ID");
 }
 
@@ -189,9 +218,10 @@ function computeFireProjection(p, metrics) {
 /* ---------------------------------------------------------------------- */
 
 function Field({ label, value, onChange, prefix, suffix, type = "number", placeholder, T }) {
+  const { t } = useLang();
   return (
     <label className="block">
-      <span className={cn("mb-1.5 block text-sm", T.subtext)}>{label}</span>
+      <span className={cn("mb-1.5 block text-sm", T.subtext)}>{t(label)}</span>
       <div className="relative">
         {prefix && <span className={cn("pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-data text-sm", T.mutedText)}>{prefix}</span>}
         <input
@@ -212,9 +242,10 @@ function Field({ label, value, onChange, prefix, suffix, type = "number", placeh
 }
 
 function NumberField({ label, value, onChange, suffix, maxDigits = 3, T }) {
+  const { t } = useLang();
   return (
     <label className="block">
-      <span className={cn("mb-1.5 block text-sm", T.subtext)}>{label}</span>
+      <span className={cn("mb-1.5 block text-sm", T.subtext)}>{t(label)}</span>
       <div className="relative">
         <input
           type="text"
@@ -231,16 +262,17 @@ function NumberField({ label, value, onChange, suffix, maxDigits = 3, T }) {
             T.inputBg, T.inputBorder, T.text, suffix ? "pr-14" : ""
           )}
         />
-        {suffix && <span className={cn("pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm", T.mutedText)}>{suffix}</span>}
+        {suffix && <span className={cn("pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm", T.mutedText)}>{t(suffix)}</span>}
       </div>
     </label>
   );
 }
 
 function AmountField({ label, value, onChange, error, T }) {
+  const { t } = useLang();
   return (
     <label className="block">
-      <span className={cn("mb-1.5 block text-sm", T.subtext)}>{label}</span>
+      <span className={cn("mb-1.5 block text-sm", T.subtext)}>{t(label)}</span>
       <div className="relative">
         <span className={cn("pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-data text-sm", T.mutedText)}>Rp</span>
         <input
@@ -260,22 +292,23 @@ function AmountField({ label, value, onChange, error, T }) {
           )}
         />
       </div>
-      {error && <span className="mt-1 block text-xs text-red-400">Enter at least 5 digits, or leave empty if not applicable.</span>}
+      {error && <span className={cn("mt-1 block text-xs", T.bad)}>{t("Enter at least 5 digits, or leave empty if not applicable.")}</span>}
     </label>
   );
 }
 
 function SelectField({ label, value, onChange, options, T }) {
+  const { t } = useLang();
   return (
     <label className="block">
-      <span className={cn("mb-1.5 block text-sm", T.subtext)}>{label}</span>
+      <span className={cn("mb-1.5 block text-sm", T.subtext)}>{t(label)}</span>
       <select
         value={value}
         onChange={onChange}
         className={cn("w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-red-600", T.inputBg, T.inputBorder, T.text)}
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
+          <option key={o.value} value={o.value}>{t(o.label)}</option>
         ))}
       </select>
     </label>
@@ -286,49 +319,144 @@ function Switch({ checked, onChange, T }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={cn("relative h-6 w-11 rounded-full transition-colors", checked ? "bg-red-600" : "bg-zinc-700")}
+      className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", checked ? "bg-red-600" : "bg-zinc-700")}
     >
-      <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform", checked ? "translate-x-5" : "translate-x-0.5")} />
+      <span className={cn("absolute left-0 top-0.5 h-5 w-5 rounded-full bg-white transition-transform", checked ? "translate-x-[22px]" : "translate-x-0.5")} />
     </button>
   );
 }
 
+function AllocationTooltip({ active, payload, total }) {
+  const { t, fmt } = useLang();
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  const pct = total > 0 ? (d.value / total) * 100 : 0;
+  return (
+    <div className="rounded-xl border border-zinc-700 bg-zinc-900/95 px-3 py-2 shadow-2xl backdrop-blur">
+      <div className="flex items-center gap-2 text-xs font-medium text-zinc-100">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: d.color, boxShadow: `0 0 8px ${d.color}` }} />
+        {d.name}
+      </div>
+      <div className="mt-1 font-data text-sm font-semibold text-white">{formatCurrency(d.value)}</div>
+      <div className="font-data text-[11px] text-zinc-400">{fmt(pct)}% {t("of total")}</div>
+    </div>
+  );
+}
+
+const renderActiveSlice = (p) => (
+  <g style={{ filter: `drop-shadow(0 0 8px ${p.payload?.color ?? "#ffffff"}aa)` }}>
+    <Sector
+      cx={p.cx} cy={p.cy}
+      innerRadius={p.innerRadius - 2} outerRadius={p.outerRadius + 8}
+      startAngle={p.startAngle} endAngle={p.endAngle}
+      cornerRadius={8} fill={p.fill}
+    />
+  </g>
+);
+
+function AllocationChart({ data, savingsRate, T }) {
+  const { t, fmt } = useLang();
+  const [active, setActive] = useState(null);
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const current = active !== null ? data[active] : null;
+  const pctOf = (v) => fmt(total > 0 ? (v / total) * 100 : 0);
+
+  return (
+    <div>
+      <div className="relative h-52">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <defs>
+              {data.map((d, i) => (
+                <linearGradient key={d.name} id={`alloc-${i}`} x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor={d.color} stopOpacity={1} />
+                  <stop offset="100%" stopColor={d.color} stopOpacity={0.55} />
+                </linearGradient>
+              ))}
+            </defs>
+            <Pie
+              data={data} dataKey="value" nameKey="name"
+              innerRadius={62} outerRadius={84} paddingAngle={4} cornerRadius={8}
+              startAngle={90} endAngle={-270} stroke="none"
+              activeIndex={active ?? -1} activeShape={renderActiveSlice}
+              onMouseEnter={(_, i) => setActive(i)} onMouseLeave={() => setActive(null)}
+              animationDuration={900}
+            >
+              {data.map((d, i) => (
+                <Cell
+                  key={d.name} fill={`url(#alloc-${i})`}
+                  style={{ outline: "none", opacity: active === null || active === i ? 1 : 0.4, transition: "opacity 150ms" }}
+                />
+              ))}
+            </Pie>
+            <Tooltip content={<AllocationTooltip total={total} />} cursor={false} wrapperStyle={{ outline: "none", zIndex: 30 }} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className={cn("flex items-center gap-1.5 text-[11px]", T.mutedText)}>
+            {current && <span className="h-2 w-2 rounded-full" style={{ background: current.color }} />}
+            {current ? current.name : t("Savings rate")}
+          </span>
+          <span className={cn("font-data text-2xl font-bold", T.text)}>
+            {current ? `${pctOf(current.value)}%` : `${fmt(savingsRate)}%`}
+          </span>
+        </div>
+      </div>
+      <ul className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1">
+        {data.map((d, i) => (
+          <li
+            key={d.name}
+            onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)}
+            className={cn("flex cursor-default items-center justify-between gap-2 rounded-md px-2 py-1 text-xs transition-colors", active === i && T.hoverBg)}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.color, boxShadow: `0 0 8px ${d.color}` }} />
+              <span className={cn("truncate", T.subtext)}>{d.name}</span>
+            </span>
+            <span className={cn("font-data", T.text)}>{pctOf(d.value)}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function StatCard({ icon: Icon, label, value, sub, tone = "default", T }) {
-  const toneColor = { default: T.text, good: "text-emerald-400", warn: "text-amber-400", bad: "text-red-400" }[tone];
+  const { t } = useLang();
+  const toneColor = { default: T.text, good: T.good, warn: T.warn, bad: T.bad }[tone];
   return (
     <div className={cn("rounded-xl border p-4", T.panel, T.cardBorder)}>
       <div className="flex items-center justify-between">
-        <span className={cn("text-xs", T.subtext)}>{label}</span>
+        <span className={cn("text-xs", T.subtext)}>{t(label)}</span>
         <Icon size={15} className={T.mutedText} />
       </div>
       <div className={cn("mt-2 font-data text-2xl font-semibold", toneColor)}>{value}</div>
-      {sub && <div className={cn("mt-1 text-xs", T.mutedText)}>{sub}</div>}
+      {sub && <div className={cn("mt-1 text-xs", T.mutedText)}>{t(sub)}</div>}
     </div>
   );
 }
 
-function Toast({ message }) {
-  if (!message) return null;
+function Toast({ toast }) {
+  const { t } = useLang();
+  if (!toast) return null;
   return (
     <div className="fixed bottom-5 right-5 z-50 flex max-w-xs items-start gap-2 rounded-lg border border-red-900/50 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 shadow-2xl shadow-black/40">
       <Info size={16} className="mt-0.5 shrink-0 text-red-500" />
-      <span>{message}</span>
+      <span>{t(toast.key, toast.vars)}</span>
     </div>
   );
 }
 
-function HealthBadge({ status, size = "sm" }) {
-  const cfg = {
-    CRITICAL: { icon: ShieldAlert, cls: "bg-red-950/50 border-red-700/50 text-red-400" },
-    MEDIUM: { icon: ShieldQuestion, cls: "bg-amber-950/40 border-amber-700/40 text-amber-400" },
-    OPTIMAL: { icon: ShieldCheck, cls: "bg-emerald-950/40 border-emerald-700/40 text-emerald-400" },
-  }[status];
-  const Icon = cfg.icon;
+function HealthBadge({ status, size = "sm", T }) {
+  const { t } = useLang();
+  const Icon = { CRITICAL: ShieldAlert, MEDIUM: ShieldQuestion, OPTIMAL: ShieldCheck }[status];
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-data", cfg.cls, size === "lg" ? "text-sm" : "text-xs")}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-data", T.badge[status], size === "lg" ? "text-sm" : "text-xs")}>
       <Icon size={size === "lg" ? 16 : 13} />
-      {status}
+      {t(status)}
     </span>
   );
 }
@@ -351,8 +479,8 @@ function AuthShell({ children }) {
       }} />
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 flex items-center justify-center gap-2">
-          <img src={LOGO_SRC} alt="Wealthify" className="h-9 w-9 rounded-lg object-cover" />
-          <span className="font-display text-xl font-bold tracking-tight text-zinc-100">WEALTHIFY</span>
+          <img src={LOGO_SRC} alt="Batara Kuwera" className="h-9 w-9 rounded-lg object-cover" />
+          <span className="font-display text-xl font-bold tracking-tight text-zinc-100">BATARA KUWERA</span>
         </div>
         {children}
       </div>
@@ -361,29 +489,30 @@ function AuthShell({ children }) {
 }
 
 function LoginPage({ onLogin, onGoRegister, showToast }) {
+  const { t } = useLang();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
 
   const submit = (e) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) { setError("Enter your email and password to continue."); return; }
     setError("");
-    onLogin(email);
+    onLogin(email, remember);
   };
 
   return (
     <AuthShell>
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-7">
-        <h1 className="font-display text-2xl font-semibold text-zinc-100">Welcome back</h1>
-        <p className="mt-1 text-sm text-zinc-400">Sign in to check your financial posture.</p>
+        <h1 className="font-display text-2xl font-semibold text-zinc-100">{t("Welcome back")}</h1>
+        <p className="mt-1 text-sm text-zinc-400">{t("Sign in to check your financial posture.")}</p>
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <Field label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" T={DARK_TOKENS} />
           <div>
-            <span className="mb-1.5 block text-sm text-zinc-400">Password</span>
+            <span className="mb-1.5 block text-sm text-zinc-400">{t("Password")}</span>
             <div className="relative">
               <input
                 type={showPw ? "text" : "password"}
@@ -398,39 +527,39 @@ function LoginPage({ onLogin, onGoRegister, showToast }) {
             </div>
           </div>
 
-          {error && <div className="flex items-center gap-2 rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-400"><AlertTriangle size={13} />{error}</div>}
+          {error && <div className="flex items-center gap-2 rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-400"><AlertTriangle size={13} />{t(error)}</div>}
 
           <div className="flex items-center justify-between text-xs">
             <label className="flex items-center gap-2 text-zinc-400">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-3.5 w-3.5 rounded border-zinc-700 accent-red-600" />
-              Remember me
+              {t("Remember me")}
             </label>
             <button type="button" onClick={() => showToast("Password reset isn't wired up in this prototype.")} className="text-red-400 hover:text-red-300">
-              Forgot password?
+              {t("Forgot password?")}
             </button>
           </div>
 
           <button type="submit" className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500">
-            Sign in
+            {t("Sign in")}
           </button>
         </form>
 
         <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-zinc-800" /><span className="text-xs text-zinc-500">or</span><div className="h-px flex-1 bg-zinc-800" />
+          <div className="h-px flex-1 bg-zinc-800" /><span className="text-xs text-zinc-500">{t("or")}</span><div className="h-px flex-1 bg-zinc-800" />
         </div>
 
         <div className="space-y-2">
           <button onClick={() => showToast("OAuth isn't wired up in this prototype.")} className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/60">
-            Continue with Google
+            {t("Continue with Google")}
           </button>
           <button onClick={() => showToast("OAuth isn't wired up in this prototype.")} className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/60">
-            <Github size={15} /> Continue with GitHub
+            <Github size={15} /> {t("Continue with GitHub")}
           </button>
         </div>
 
         <p className="mt-6 text-center text-sm text-zinc-400">
-          Don't have an account?{" "}
-          <button onClick={onGoRegister} className="font-medium text-red-400 hover:text-red-300">Register here</button>
+          {t("Don't have an account?")}{" "}
+          <button onClick={onGoRegister} className="font-medium text-red-400 hover:text-red-300">{t("Register here")}</button>
         </p>
       </div>
     </AuthShell>
@@ -438,6 +567,7 @@ function LoginPage({ onLogin, onGoRegister, showToast }) {
 }
 
 function RegisterPage({ onRegister, onGoLogin }) {
+  const { t } = useLang();
   const [form, setForm] = useState({ fullName: "", email: "", password: "", confirm: "" });
   const [error, setError] = useState("");
 
@@ -454,8 +584,8 @@ function RegisterPage({ onRegister, onGoLogin }) {
   return (
     <AuthShell>
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-7">
-        <h1 className="font-display text-2xl font-semibold text-zinc-100">Create your account</h1>
-        <p className="mt-1 text-sm text-zinc-400">Takes about 3 minutes to set up your profile after this.</p>
+        <h1 className="font-display text-2xl font-semibold text-zinc-100">{t("Create your account")}</h1>
+        <p className="mt-1 text-sm text-zinc-400">{t("Takes about 3 minutes to set up your profile after this.")}</p>
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <Field label="Full name" type="text" value={form.fullName} onChange={update("fullName")} placeholder="Jane Doe" T={DARK_TOKENS} />
@@ -463,16 +593,16 @@ function RegisterPage({ onRegister, onGoLogin }) {
           <Field label="Password" type="password" value={form.password} onChange={update("password")} placeholder="••••••••" T={DARK_TOKENS} />
           <Field label="Confirm password" type="password" value={form.confirm} onChange={update("confirm")} placeholder="••••••••" T={DARK_TOKENS} />
 
-          {error && <div className="flex items-center gap-2 rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-400"><AlertTriangle size={13} />{error}</div>}
+          {error && <div className="flex items-center gap-2 rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-400"><AlertTriangle size={13} />{t(error)}</div>}
 
           <button type="submit" className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500">
-            Create account
+            {t("Create account")}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-zinc-400">
-          Already have an account?{" "}
-          <button onClick={onGoLogin} className="font-medium text-red-400 hover:text-red-300">Log in here</button>
+          {t("Already have an account?")}{" "}
+          <button onClick={onGoLogin} className="font-medium text-red-400 hover:text-red-300">{t("Log in here")}</button>
         </p>
       </div>
     </AuthShell>
@@ -495,6 +625,7 @@ const STEP_AMOUNT_FIELDS = [
 ];
 
 function OnboardingPage({ profile, setProfile, onComplete }) {
+  const { t } = useLang();
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState({});
   const T = DARK_TOKENS;
@@ -518,13 +649,13 @@ function OnboardingPage({ profile, setProfile, onComplete }) {
     <div className="min-h-screen bg-zinc-950 px-4 py-10">
       <div className="mx-auto max-w-xl">
         <div className="mb-8 flex items-center gap-2">
-          <img src={LOGO_SRC} alt="Wealthify" className="h-9 w-9 rounded-lg object-cover" />
-          <span className="font-display text-xl font-bold text-zinc-100">WEALTHIFY</span>
+          <img src={LOGO_SRC} alt="Batara Kuwera" className="h-9 w-9 rounded-lg object-cover" />
+          <span className="font-display text-xl font-bold text-zinc-100">BATARA KUWERA</span>
         </div>
 
         <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
-          <span>Step {step + 1} of {ONBOARDING_STEPS.length}</span>
-          <span>{ONBOARDING_STEPS[step]}</span>
+          <span>{t("Step {current} of {total}", { current: step + 1, total: ONBOARDING_STEPS.length })}</span>
+          <span>{t(ONBOARDING_STEPS[step])}</span>
         </div>
         <div className="mb-8 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
           <div className="h-full rounded-full bg-red-600 transition-all" style={{ width: `${((step + 1) / ONBOARDING_STEPS.length) * 100}%` }} />
@@ -533,7 +664,7 @@ function OnboardingPage({ profile, setProfile, onComplete }) {
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-7">
           {step === 0 && (
             <div className="space-y-4">
-              <h2 className="font-display text-lg font-semibold text-zinc-100">Tell us about you</h2>
+              <h2 className="font-display text-lg font-semibold text-zinc-100">{t("Tell us about you")}</h2>
               <Field label="Full name" type="text" value={profile.fullName} onChange={set("fullName")} T={T} />
               <div className="grid grid-cols-2 gap-4">
                 <NumberField label="Age" value={profile.age} onChange={(v) => setProfile((p) => ({ ...p, age: v }))} maxDigits={3} T={T} />
@@ -546,8 +677,8 @@ function OnboardingPage({ profile, setProfile, onComplete }) {
 
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="font-display text-lg font-semibold text-zinc-100">Monthly income</h2>
-              <p className="text-sm text-zinc-400">What comes in each month, before anything goes out.</p>
+              <h2 className="font-display text-lg font-semibold text-zinc-100">{t("Monthly income")}</h2>
+              <p className="text-sm text-zinc-400">{t("What comes in each month, before anything goes out.")}</p>
               <AmountField label="Base salary" value={profile.baseSalary} onChange={setAmount("baseSalary")} error={errors.baseSalary} T={T} />
               <AmountField label="Side income (freelance, business, etc.)" value={profile.sideIncome} onChange={setAmount("sideIncome")} error={errors.sideIncome} T={T} />
             </div>
@@ -555,8 +686,8 @@ function OnboardingPage({ profile, setProfile, onComplete }) {
 
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="font-display text-lg font-semibold text-zinc-100">Monthly expenses</h2>
-              <p className="text-sm text-zinc-400">Split fixed needs from lifestyle spending and debt payments.</p>
+              <h2 className="font-display text-lg font-semibold text-zinc-100">{t("Monthly expenses")}</h2>
+              <p className="text-sm text-zinc-400">{t("Split fixed needs from lifestyle spending and debt payments.")}</p>
               <AmountField label="Essential needs (rent, food, bills)" value={profile.essentialExpenses} onChange={setAmount("essentialExpenses")} error={errors.essentialExpenses} T={T} />
               <AmountField label="Discretionary / lifestyle" value={profile.discretionaryExpenses} onChange={setAmount("discretionaryExpenses")} error={errors.discretionaryExpenses} T={T} />
               <AmountField label="Monthly debt repayments" value={profile.monthlyDebtRepayment} onChange={setAmount("monthlyDebtRepayment")} error={errors.monthlyDebtRepayment} T={T} />
@@ -565,7 +696,7 @@ function OnboardingPage({ profile, setProfile, onComplete }) {
 
           {step === 3 && (
             <div className="space-y-4">
-              <h2 className="font-display text-lg font-semibold text-zinc-100">Savings & assets</h2>
+              <h2 className="font-display text-lg font-semibold text-zinc-100">{t("Savings & assets")}</h2>
               <AmountField label="Liquid savings (cash, emergency fund)" value={profile.liquidSavings} onChange={setAmount("liquidSavings")} error={errors.liquidSavings} T={T} />
               <AmountField label="Investments (stocks, crypto, retirement)" value={profile.investments} onChange={setAmount("investments")} error={errors.investments} T={T} />
               <AmountField label="Real estate equity" value={profile.realEstate} onChange={setAmount("realEstate")} error={errors.realEstate} T={T} />
@@ -574,7 +705,7 @@ function OnboardingPage({ profile, setProfile, onComplete }) {
 
           {step === 4 && (
             <div className="space-y-4">
-              <h2 className="font-display text-lg font-semibold text-zinc-100">Liabilities</h2>
+              <h2 className="font-display text-lg font-semibold text-zinc-100">{t("Liabilities")}</h2>
               <AmountField label="Short-term debt (credit cards, consumer loans)" value={profile.shortTermDebt} onChange={setAmount("shortTermDebt")} error={errors.shortTermDebt} T={T} />
               <AmountField label="Long-term debt (mortgage, student loans)" value={profile.longTermDebt} onChange={setAmount("longTermDebt")} error={errors.longTermDebt} T={T} />
             </div>
@@ -582,19 +713,19 @@ function OnboardingPage({ profile, setProfile, onComplete }) {
 
           {step === 5 && (
             <div className="space-y-4">
-              <h2 className="font-display text-lg font-semibold text-zinc-100">Financial goals</h2>
+              <h2 className="font-display text-lg font-semibold text-zinc-100">{t("Financial goals")}</h2>
               <NumberField label="Target retirement age" suffix="yrs" value={profile.targetRetirementAge} onChange={(v) => setProfile((p) => ({ ...p, targetRetirementAge: v }))} maxDigits={3} T={T} />
               <AmountField label="Desired monthly budget in retirement" value={profile.monthlyLifestyleTarget} onChange={setAmount("monthlyLifestyleTarget")} error={errors.monthlyLifestyleTarget} T={T} />
-              <p className="text-xs text-zinc-500">Leave this empty to base your target on your current spending instead.</p>
+              <p className="text-xs text-zinc-500">{t("Leave this empty to base your target on your current spending instead.")}</p>
             </div>
           )}
 
           <div className="mt-7 flex items-center justify-between">
             <button onClick={back} disabled={step === 0} className={cn("flex items-center gap-1 rounded-lg px-3 py-2 text-sm", step === 0 ? "cursor-not-allowed text-zinc-700" : "text-zinc-400 hover:text-zinc-200")}>
-              <ChevronLeft size={15} /> Back
+              <ChevronLeft size={15} /> {t("Back")}
             </button>
             <button onClick={next} className="flex items-center gap-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500">
-              {step === ONBOARDING_STEPS.length - 1 ? "Finish setup" : "Next"}
+              {step === ONBOARDING_STEPS.length - 1 ? t("Finish setup") : t("Next")}
               {step < ONBOARDING_STEPS.length - 1 && <ChevronRight size={15} />}
               {step === ONBOARDING_STEPS.length - 1 && <Check size={15} />}
             </button>
@@ -618,6 +749,7 @@ const NAV_ITEMS = [
 ];
 
 function AppShell({ page, setPage, onLogout, T, healthStatus, userName, sidebarOpen, setSidebarOpen, children }) {
+  const { t } = useLang();
   return (
     <div className={cn("flex min-h-screen", T.bg)}>
       {sidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/50 md:hidden" />}
@@ -627,8 +759,8 @@ function AppShell({ page, setPage, onLogout, T, healthStatus, userName, sidebarO
         T.sidebarBg, T.border, sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className={cn("flex items-center gap-2 border-b px-5 py-5", T.border)}>
-          <img src={LOGO_SRC} alt="Wealthify" className="h-8 w-8 rounded-lg object-cover" />
-          <span className={cn("font-display text-lg font-bold", T.text)}>WEALTHIFY</span>
+          <img src={LOGO_SRC} alt="Batara Kuwera" className="h-8 w-8 rounded-lg object-cover" />
+          <span className={cn("font-display text-lg font-bold", T.text)}>BATARA KUWERA</span>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
@@ -641,10 +773,10 @@ function AppShell({ page, setPage, onLogout, T, healthStatus, userName, sidebarO
                 onClick={() => { setPage(item.id); setSidebarOpen(false); }}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-lg border-l-2 px-3 py-2.5 text-sm transition-colors",
-                  active ? "border-red-600 bg-red-600/10 text-red-400" : cn("border-transparent", T.subtext, T.hoverBg)
+                  active ? cn("border-red-600 bg-red-600/10", T.accent) : cn("border-transparent", T.subtext, T.hoverBg)
                 )}
               >
-                <Icon size={16} /> {item.label}
+                <Icon size={16} /> {t(item.label)}
               </button>
             );
           })}
@@ -652,12 +784,12 @@ function AppShell({ page, setPage, onLogout, T, healthStatus, userName, sidebarO
 
         <div className={cn("border-t p-4", T.border)}>
           <div className="mb-3 flex items-center justify-between">
-            <span className={cn("text-xs", T.mutedText)}>Status</span>
-            <HealthBadge status={healthStatus} />
+            <span className={cn("text-xs", T.mutedText)}>{t("Status")}</span>
+            <HealthBadge status={healthStatus} T={T} />
           </div>
-          <div className={cn("mb-3 truncate text-sm font-medium", T.text)}>{userName || "Guest"}</div>
+          <div className={cn("mb-3 truncate text-sm font-medium", T.text)}>{userName || t("Guest")}</div>
           <button onClick={onLogout} className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm", T.subtext, T.hoverBg)}>
-            <LogOut size={15} /> Log out
+            <LogOut size={15} /> {t("Log out")}
           </button>
         </div>
       </aside>
@@ -665,8 +797,8 @@ function AppShell({ page, setPage, onLogout, T, healthStatus, userName, sidebarO
       <div className="flex min-h-screen flex-1 flex-col">
         <header className={cn("flex items-center gap-3 border-b px-4 py-3 md:hidden", T.border, T.panel)}>
           <button onClick={() => setSidebarOpen(true)} className={T.text}><Menu size={20} /></button>
-          <img src={LOGO_SRC} alt="Wealthify" className="h-6 w-6 rounded-md object-cover" />
-          <span className={cn("font-display font-bold", T.text)}>WEALTHIFY</span>
+          <img src={LOGO_SRC} alt="Batara Kuwera" className="h-6 w-6 rounded-md object-cover" />
+          <span className={cn("font-display font-bold", T.text)}>BATARA KUWERA</span>
         </header>
         <main className="flex-1 p-4 md:p-8">{children}</main>
       </div>
@@ -685,62 +817,54 @@ const DIAGNOSIS = {
 };
 
 function DashboardPage({ profile, metrics, fireData, T }) {
+  const { t, fmt, lang } = useLang();
   const pieData = [
-    { name: "Essentials", value: profile.essentialExpenses, color: "#dc2626" },
-    { name: "Discretionary", value: profile.discretionaryExpenses, color: "#fb923c" },
-    { name: "Debt repayment", value: profile.monthlyDebtRepayment, color: "#f59e0b" },
-    { name: "Savings", value: Math.max(metrics.monthlyIncome - metrics.monthlyExpenses, 0), color: "#10b981" },
+    { name: t("Essentials"), value: profile.essentialExpenses, color: "#dc2626" },
+    { name: t("Discretionary"), value: profile.discretionaryExpenses, color: "#fb923c" },
+    { name: t("Debt repayment"), value: profile.monthlyDebtRepayment, color: "#f59e0b" },
+    { name: t("Savings"), value: Math.max(metrics.monthlyIncome - metrics.monthlyExpenses, 0), color: "#10b981" },
   ].filter((d) => d.value > 0);
+  const [billion, million] = lang === "id" ? ["M", "jt"] : ["B", "M"];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className={cn("font-display text-2xl font-bold", T.text)}>Dashboard</h1>
-        <p className={cn("text-sm", T.subtext)}>Here's where things stand this month.</p>
+        <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("Dashboard")}</h1>
+        <p className={cn("text-sm", T.subtext)}>{t("Here's where things stand this month.")}</p>
       </div>
 
       <div className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
         <div className="flex flex-wrap items-center gap-3">
-          <HealthBadge status={metrics.healthStatus} size="lg" />
-          <span className={cn("text-sm", T.subtext)}>Financial health status</span>
+          <HealthBadge status={metrics.healthStatus} size="lg" T={T} />
+          <span className={cn("text-sm", T.subtext)}>{t("Financial health status")}</span>
         </div>
-        <p className={cn("mt-3 text-sm", T.text)}>{DIAGNOSIS[metrics.healthStatus]}</p>
+        <p className={cn("mt-3 text-sm", T.text)}>{t(DIAGNOSIS[metrics.healthStatus])}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={Wallet} label="Net worth" value={formatCurrency(metrics.netWorth)} T={T} tone={metrics.netWorth >= 0 ? "good" : "bad"} />
-        <StatCard icon={TrendingUp} label="Savings rate" value={`${metrics.savingsRate.toFixed(1)}%`} T={T} tone={metrics.savingsRate > 30 ? "good" : metrics.savingsRate < 10 ? "bad" : "warn"} />
-        <StatCard icon={CreditCard} label="Debt-to-income" value={`${metrics.dti.toFixed(1)}%`} T={T} tone={metrics.dti < 20 ? "good" : metrics.dti > 40 ? "bad" : "warn"} />
-        <StatCard icon={PiggyBank} label="Emergency fund" value={`${metrics.emergencyFundRatio.toFixed(1)} mo`} T={T} tone={metrics.emergencyFundRatio > 6 ? "good" : metrics.emergencyFundRatio < 3 ? "bad" : "warn"} sub="Months of expenses covered" />
+        <StatCard icon={TrendingUp} label="Savings rate" value={`${fmt(metrics.savingsRate)}%`} T={T} tone={metrics.savingsRate > 30 ? "good" : metrics.savingsRate < 10 ? "bad" : "warn"} />
+        <StatCard icon={CreditCard} label="Debt-to-income" value={`${fmt(metrics.dti)}%`} T={T} tone={metrics.dti < 20 ? "good" : metrics.dti > 40 ? "bad" : "warn"} />
+        <StatCard icon={PiggyBank} label="Emergency fund" value={`${fmt(metrics.emergencyFundRatio)} ${t("mo")}`} T={T} tone={metrics.emergencyFundRatio > 6 ? "good" : metrics.emergencyFundRatio < 3 ? "bad" : "warn"} sub="Months of expenses covered" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
         <div className={cn("rounded-2xl border p-5 lg:col-span-2", T.panel, T.cardBorder)}>
-          <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>Income allocation</h3>
+          <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>{t("Income allocation")}</h3>
           {pieData.length > 0 ? (
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} paddingAngle={3}>
-                    {pieData.map((entry, i) => <Cell key={i} fill={entry.color} stroke="none" />)}
-                  </Pie>
-                  <Tooltip formatter={(v) => formatCurrency(v)} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : <p className={cn("text-sm", T.mutedText)}>Add income and expense figures in your profile to see this chart.</p>}
+            <AllocationChart data={pieData} savingsRate={metrics.savingsRate} T={T} />
+          ) : <p className={cn("text-sm", T.mutedText)}>{t("Add income and expense figures in your profile to see this chart.")}</p>}
         </div>
 
         <div className={cn("rounded-2xl border p-5 lg:col-span-3", T.panel, T.cardBorder)}>
           <div className="mb-1 flex items-center justify-between">
-            <h3 className={cn("font-display text-sm font-semibold", T.text)}>Financial freedom trajectory</h3>
-            <span className={cn("font-data text-xs", T.mutedText)}>FIRE target: {formatCurrency(fireData.fireNumber)}</span>
+            <h3 className={cn("font-display text-sm font-semibold", T.text)}>{t("Financial freedom trajectory")}</h3>
+            <span className={cn("font-data text-xs", T.mutedText)}>{t("FIRE target")}: {formatCurrency(fireData.fireNumber)}</span>
           </div>
           <p className={cn("mb-3 text-xs", T.mutedText)}>
             {fireData.onTrack
-              ? `At this pace, you're projected to hit financial freedom around age ${Math.round(fireData.projectedFreedomAge)}.`
-              : "At this pace, you're not projected to reach your FIRE number within the modeled horizon — raising your savings rate moves this forward."}
+              ? t("At this pace, you're projected to hit financial freedom around age {age}.", { age: Math.round(fireData.projectedFreedomAge) })
+              : t("At this pace, you're not projected to reach your FIRE number within the modeled horizon — raising your savings rate moves this forward.")}
           </p>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
@@ -751,27 +875,27 @@ function DashboardPage({ profile, metrics, fireData, T }) {
                     <stop offset="100%" stopColor="#dc2626" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" vertical={false} />
-                <XAxis dataKey="age" tick={{ fontSize: 11, fill: "#71717a" }} label={{ value: "Age", position: "insideBottom", offset: -3, fontSize: 11, fill: "#71717a" }} />
-                <YAxis tick={{ fontSize: 10, fill: "#71717a" }} tickFormatter={(v) => (v >= 1e9 ? `${(v / 1e9).toFixed(0)}B` : v >= 1e6 ? `${(v / 1e6).toFixed(0)}M` : v)} width={40} />
-                <Tooltip formatter={(v) => formatCurrency(v)} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }} />
-                <Area type="monotone" dataKey="netWorth" name="Projected net worth" stroke="#dc2626" fill="url(#nw)" strokeWidth={2} />
-                <Line type="monotone" dataKey="fireTarget" name="FIRE target" stroke="#71717a" strokeDasharray="5 5" dot={false} strokeWidth={1.5} />
+                <CartesianGrid strokeDasharray="3 3" stroke={T.chartGrid} vertical={false} />
+                <XAxis dataKey="age" tick={{ fontSize: 11, fill: "#71717a" }} label={{ value: t("Age"), position: "insideBottom", offset: -3, fontSize: 11, fill: "#71717a" }} />
+                <YAxis tick={{ fontSize: 10, fill: "#71717a" }} tickFormatter={(v) => (v >= 1e9 ? `${(v / 1e9).toFixed(0)}${billion}` : v >= 1e6 ? `${(v / 1e6).toFixed(0)}${million}` : v)} width={40} />
+                <Tooltip formatter={(v) => formatCurrency(v)} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "#e4e4e7" }} itemStyle={{ color: "#f4f4f5" }} />
+                <Area type="monotone" dataKey="netWorth" name={t("Projected net worth")} stroke="#dc2626" fill="url(#nw)" strokeWidth={2} />
+                <Line type="monotone" dataKey="fireTarget" name={t("FIRE target")} stroke="#71717a" strokeDasharray="5 5" dot={false} strokeWidth={1.5} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          <p className={cn("mt-2 text-xs", T.mutedText)}>Educational estimate assuming a 7% annual return — not a guarantee or financial advice.</p>
+          <p className={cn("mt-2 text-xs", T.mutedText)}>{t("Educational estimate assuming a 7% annual return — not a guarantee or financial advice.")}</p>
         </div>
       </div>
 
       <div className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
-        <h3 className={cn("mb-3 font-display text-sm font-semibold", T.text)}>Glossary</h3>
+        <h3 className={cn("mb-3 font-display text-sm font-semibold", T.text)}>{t("Glossary")}</h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {GLOSSARY.map((g) => (
             <div key={g.term} className="group relative">
-              <div className={cn("cursor-help rounded-lg border px-3 py-2 text-xs font-data", T.border, T.subtext)}>{g.term}</div>
+              <div className={cn("cursor-help rounded-lg border px-3 py-2 text-xs font-data", T.border, T.subtext)}>{t(g.term)}</div>
               <div className={cn("invisible absolute bottom-full left-0 z-20 mb-2 w-56 rounded-lg border p-3 text-xs opacity-0 shadow-2xl transition-opacity duration-150 group-hover:visible group-hover:opacity-100", T.panel, T.border, T.subtext)}>
-                {g.def}
+                {t(g.def)}
               </div>
             </div>
           ))}
@@ -793,11 +917,12 @@ function canBookExpert(expert, tier) {
 }
 
 function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
+  const { t } = useLang();
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className={cn("font-display text-2xl font-bold", T.text)}>Experts</h1>
-        <p className={cn("text-sm", T.subtext)}>Certified planners and advisors, matched to what you need help with.</p>
+        <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("Experts")}</h1>
+        <p className={cn("text-sm", T.subtext)}>{t("Certified planners and advisors, matched to what you need help with.")}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -806,31 +931,31 @@ function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
           return (
             <div key={ex.id} className={cn("flex flex-col rounded-2xl border p-5", T.panel, T.cardBorder)}>
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-600/15 font-display text-sm font-semibold text-red-400">
+                <div className={cn("flex h-11 w-11 items-center justify-center rounded-full bg-red-600/15 font-display text-sm font-semibold", T.accent)}>
                   {ex.name.split(" ").map((n) => n[0]).join("")}
                 </div>
                 <div>
                   <div className={cn("text-sm font-semibold", T.text)}>{ex.name}</div>
-                  <div className={cn("font-data text-xs", T.mutedText)}>{ex.cert} · {ex.years} yrs</div>
+                  <div className={cn("font-data text-xs", T.mutedText)}>{ex.cert} · {ex.years} {t("yrs")}</div>
                 </div>
-                <div className="ml-auto flex items-center gap-1 text-xs text-amber-400"><Star size={12} fill="currentColor" />{ex.rating}</div>
+                <div className={cn("ml-auto flex items-center gap-1 text-xs", T.warn)}><Star size={12} fill="currentColor" />{ex.rating}</div>
               </div>
-              <p className={cn("mt-3 flex-1 text-sm", T.subtext)}>{ex.bio}</p>
+              <p className={cn("mt-3 flex-1 text-sm", T.subtext)}>{t(ex.bio)}</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {ex.specialties.map((s) => (
-                  <span key={s} className={cn("rounded-md border px-2 py-0.5 font-data text-xs", T.border, T.mutedText)}>{s}</span>
+                  <span key={s} className={cn("rounded-md border px-2 py-0.5 font-data text-xs", T.border, T.mutedText)}>{t(s)}</span>
                 ))}
               </div>
               <button
                 onClick={() => gate.allowed
-                  ? showToast(`Session request sent to ${ex.name}. They'll reach out within 24 hours.`)
+                  ? showToast("Session request sent to {name}. They'll reach out within 24 hours.", { name: ex.name })
                   : (showToast(gate.reason), setPage("subscription"))}
                 className={cn(
                   "mt-4 rounded-lg py-2 text-sm font-semibold transition-colors",
                   gate.allowed ? "bg-red-600 text-white hover:bg-red-500" : cn("border", T.border, T.subtext, T.hoverBg)
                 )}
               >
-                {gate.allowed ? "Book session" : "Subscribe to access"}
+                {gate.allowed ? t("Book session") : t("Subscribe to access")}
               </button>
             </div>
           );
@@ -845,19 +970,20 @@ function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
 /* ---------------------------------------------------------------------- */
 
 function SubscriptionPage({ subscriptionTier, setSubscriptionTier, showToast, T }) {
+  const { t } = useLang();
   const [cycle, setCycle] = useState("monthly");
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className={cn("font-display text-2xl font-bold", T.text)}>Subscription</h1>
-        <p className={cn("text-sm", T.subtext)}>Pick the level of support that matches where you are.</p>
+        <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("Subscription")}</h1>
+        <p className={cn("text-sm", T.subtext)}>{t("Pick the level of support that matches where you are.")}</p>
       </div>
 
       <div className={cn("inline-flex rounded-lg border p-1", T.border)}>
         {["monthly", "annual"].map((c) => (
           <button key={c} onClick={() => setCycle(c)} className={cn("rounded-md px-4 py-1.5 text-sm capitalize transition-colors", cycle === c ? "bg-red-600 text-white" : cn(T.subtext))}>
-            {c} {c === "annual" && <span className="ml-1 text-xs text-emerald-400">save 17%</span>}
+            {t(c)} {c === "annual" && <span className={cn("ml-1 text-xs", cycle === "annual" ? "text-white" : T.good)}>{t("save 17%")}</span>}
           </button>
         ))}
       </div>
@@ -869,37 +995,37 @@ function SubscriptionPage({ subscriptionTier, setSubscriptionTier, showToast, T 
           const fullAnnual = tier.monthly * 12;
           return (
             <div key={tier.id} className={cn("flex flex-col rounded-2xl border p-6", T.panel, active ? "border-red-600" : T.cardBorder)}>
-              {active && <span className="mb-2 w-fit rounded-full bg-red-600/15 px-2 py-0.5 font-data text-xs text-red-400">Current plan</span>}
+              {active && <span className={cn("mb-2 w-fit rounded-full bg-red-600/15 px-2 py-0.5 font-data text-xs", T.accent)}>{t("Current plan")}</span>}
               <h3 className={cn("font-display text-lg font-semibold", T.text)}>{tier.name}</h3>
-              <p className={cn("text-sm", T.subtext)}>{tier.tagline}</p>
+              <p className={cn("text-sm", T.subtext)}>{t(tier.tagline)}</p>
               <div className={cn("mt-4 font-data text-3xl font-bold", T.text)}>
-                {formatPrice(price)}
-                {price > 0 && <span className={cn("text-sm font-normal", T.mutedText)}>/{cycle === "monthly" ? "mo" : "yr"}</span>}
+                {price === 0 ? t("Free") : formatPrice(price)}
+                {price > 0 && <span className={cn("text-sm font-normal", T.mutedText)}>/{t(cycle === "monthly" ? "mo" : "yr")}</span>}
               </div>
               {cycle === "annual" && price > 0 && (
                 <div className="mt-1 flex items-center gap-2 text-xs">
                   <span className={cn("font-data line-through", T.mutedText)}>{formatPrice(fullAnnual)}</span>
-                  <span className="font-data text-emerald-400">save {formatPrice(fullAnnual - price)}</span>
+                  <span className={cn("font-data", T.good)}>{t("save {amount}", { amount: formatPrice(fullAnnual - price) })}</span>
                 </div>
               )}
               <ul className="mt-5 flex-1 space-y-2">
                 {tier.features.map((f) => (
                   <li key={f} className={cn("flex items-start gap-2 text-sm", T.subtext)}>
-                    <Check size={14} className="mt-0.5 shrink-0 text-emerald-400" /> {f}
+                    <Check size={14} className={cn("mt-0.5 shrink-0", T.good)} /> {t(f)}
                   </li>
                 ))}
                 {tier.excludes && tier.excludes.map((f) => (
                   <li key={f} className={cn("flex items-start gap-2 text-sm", T.mutedText)}>
-                    <X size={14} className="mt-0.5 shrink-0" /> {f}
+                    <X size={14} className="mt-0.5 shrink-0" /> {t(f)}
                   </li>
                 ))}
               </ul>
               <button
-                onClick={() => { setSubscriptionTier(tier.id); showToast(`You're now on the ${tier.name} plan.`); }}
+                onClick={() => { setSubscriptionTier(tier.id); showToast("You're now on the {name} plan.", { name: tier.name }); }}
                 disabled={active}
                 className={cn("mt-5 rounded-lg py-2.5 text-sm font-semibold transition-colors", active ? cn("cursor-default border", T.border, T.mutedText) : "bg-red-600 text-white hover:bg-red-500")}
               >
-                {active ? "Selected" : "Select plan"}
+                {active ? t("Selected") : t("Select plan")}
               </button>
             </div>
           );
@@ -913,7 +1039,8 @@ function SubscriptionPage({ subscriptionTier, setSubscriptionTier, showToast, T 
 /*  Settings page                                                          */
 /* ---------------------------------------------------------------------- */
 
-function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, metrics, onDeleteAccount, showToast, T }) {
+function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setProfile, metrics, onDeleteAccount, showToast, T }) {
+  const { t, fmt, lang } = useLang();
   const [notifEmail, setNotifEmail] = useState(true);
   const [twoFA, setTwoFA] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -943,7 +1070,7 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
       const blob = new Blob([JSON.stringify({ user, profile }, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = "wealthify-financial-data.json";
+      a.href = url; a.download = "batara-kuwera-financial-data.json";
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast("Your data export has started downloading.");
@@ -955,8 +1082,8 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className={cn("font-display text-2xl font-bold", T.text)}>Settings</h1>
-        <p className={cn("text-sm", T.subtext)}>Manage your account, appearance, and data.</p>
+        <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("Settings")}</h1>
+        <p className={cn("text-sm", T.subtext)}>{t("Manage your account, appearance, and data.")}</p>
       </div>
 
       <section className={cn("overflow-hidden rounded-2xl border", T.panel, T.cardBorder)}>
@@ -966,13 +1093,13 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
             <div>
               <div className="flex items-center gap-2">
                 <Wallet size={15} className="text-red-500" />
-                <h3 className={cn("font-display text-sm font-semibold", T.text)}>Financial profile</h3>
+                <h3 className={cn("font-display text-sm font-semibold", T.text)}>{t("Financial profile")}</h3>
               </div>
               <p className={cn("mt-1 max-w-md text-sm", T.subtext)}>
-                Your saved figures power every metric on the dashboard. Update them whenever your income, expenses, or debts change.
+                {t("Your saved figures power every metric on the dashboard. Update them whenever your income, expenses, or debts change.")}
               </p>
             </div>
-            <HealthBadge status={metrics.healthStatus} />
+            <HealthBadge status={metrics.healthStatus} T={T} />
           </div>
 
           <div className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -980,10 +1107,10 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
               { label: "Income", value: formatCurrency(metrics.monthlyIncome) },
               { label: "Expenses", value: formatCurrency(metrics.monthlyExpenses) },
               { label: "Net worth", value: formatCurrency(metrics.netWorth) },
-              { label: "Savings rate", value: metrics.savingsRate.toFixed(1) + "%" },
+              { label: "Savings rate", value: fmt(metrics.savingsRate) + "%" },
             ].map((s) => (
               <div key={s.label} className={cn("rounded-lg border px-3 py-2", T.border)}>
-                <div className={cn("text-xs", T.mutedText)}>{s.label}</div>
+                <div className={cn("text-xs", T.mutedText)}>{t(s.label)}</div>
                 <div className={cn("truncate font-data text-sm font-semibold", T.text)}>{s.value}</div>
               </div>
             ))}
@@ -991,7 +1118,7 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
 
           {!editingFinances && (
             <button onClick={openEditor} className="relative mt-4 flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500">
-              <TrendingUp size={15} /> Update financial info
+              <TrendingUp size={15} /> {t("Update financial info")}
             </button>
           )}
         </div>
@@ -1000,7 +1127,7 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
           <div className={cn("border-t px-5 py-5", T.border)}>
             <div className="space-y-5">
               <div>
-                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>Monthly income</h4>
+                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>{t("Monthly income")}</h4>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <AmountField label="Base salary" value={draft.baseSalary} onChange={setDraftAmount("baseSalary")} error={draftErrors.baseSalary} T={T} />
                   <AmountField label="Side income" value={draft.sideIncome} onChange={setDraftAmount("sideIncome")} error={draftErrors.sideIncome} T={T} />
@@ -1008,7 +1135,7 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
               </div>
 
               <div>
-                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>Monthly expenses</h4>
+                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>{t("Monthly expenses")}</h4>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <AmountField label="Essential needs" value={draft.essentialExpenses} onChange={setDraftAmount("essentialExpenses")} error={draftErrors.essentialExpenses} T={T} />
                   <AmountField label="Discretionary / lifestyle" value={draft.discretionaryExpenses} onChange={setDraftAmount("discretionaryExpenses")} error={draftErrors.discretionaryExpenses} T={T} />
@@ -1017,7 +1144,7 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
               </div>
 
               <div>
-                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>Savings & assets</h4>
+                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>{t("Savings & assets")}</h4>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <AmountField label="Liquid savings" value={draft.liquidSavings} onChange={setDraftAmount("liquidSavings")} error={draftErrors.liquidSavings} T={T} />
                   <AmountField label="Investments" value={draft.investments} onChange={setDraftAmount("investments")} error={draftErrors.investments} T={T} />
@@ -1026,7 +1153,7 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
               </div>
 
               <div>
-                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>Liabilities</h4>
+                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>{t("Liabilities")}</h4>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <AmountField label="Short-term debt" value={draft.shortTermDebt} onChange={setDraftAmount("shortTermDebt")} error={draftErrors.shortTermDebt} T={T} />
                   <AmountField label="Long-term debt" value={draft.longTermDebt} onChange={setDraftAmount("longTermDebt")} error={draftErrors.longTermDebt} T={T} />
@@ -1034,7 +1161,7 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
               </div>
 
               <div>
-                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>Goals & personal</h4>
+                <h4 className={cn("mb-3 font-data text-xs uppercase tracking-wider", T.mutedText)}>{t("Goals & personal")}</h4>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <NumberField label="Age" value={draft.age} onChange={(v) => setDraft((d) => ({ ...d, age: v }))} maxDigits={3} T={T} />
                   <NumberField label="Target retirement age" suffix="yrs" value={draft.targetRetirementAge} onChange={(v) => setDraft((d) => ({ ...d, targetRetirementAge: v }))} maxDigits={3} T={T} />
@@ -1046,10 +1173,10 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
 
               <div className="flex flex-wrap gap-3 pt-1">
                 <button onClick={saveFinances} className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500">
-                  <Check size={15} /> Save changes
+                  <Check size={15} /> {t("Save changes")}
                 </button>
                 <button onClick={() => setEditingFinances(false)} className={cn("rounded-lg border px-4 py-2.5 text-sm", T.border, T.subtext, T.hoverBg)}>
-                  Cancel
+                  {t("Cancel")}
                 </button>
               </div>
             </div>
@@ -1058,28 +1185,28 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
       </section>
 
       <section className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
-        <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>Appearance</h3>
+        <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>{t("Appearance")}</h3>
         <div className="flex gap-2">
           {[{ id: "dark", icon: Moon, label: "Dark" }, { id: "light", icon: Sun, label: "Light" }, { id: "system", icon: Monitor, label: "System" }].map((opt) => (
             <button key={opt.id} onClick={() => setTheme(opt.id)} className={cn(
               "flex flex-1 flex-col items-center gap-1.5 rounded-lg border py-3 text-xs transition-colors",
-              theme === opt.id ? "border-red-600 text-red-400" : cn(T.border, T.subtext)
+              theme === opt.id ? cn("border-red-600", T.accent) : cn(T.border, T.subtext)
             )}>
-              <opt.icon size={16} /> {opt.label}
+              <opt.icon size={16} /> {t(opt.label)}
             </button>
           ))}
         </div>
       </section>
 
       <section className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
-        <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>Account</h3>
+        <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>{t("Account")}</h3>
         <div className="space-y-4">
           <Field label="Full name" type="text" value={profile.fullName} onChange={(e) => { const v = e.target.value; setProfile((p) => ({ ...p, fullName: v })); setUser((u) => ({ ...u, fullName: v })); }} T={T} />
           <Field label="Email" type="email" value={user.email} onChange={(e) => setUser((u) => ({ ...u, email: e.target.value }))} T={T} />
           <div className="flex items-center justify-between">
             <div>
-              <div className={cn("text-sm", T.text)}>Two-factor authentication</div>
-              <div className={cn("text-xs", T.mutedText)}>Add an extra step when signing in.</div>
+              <div className={cn("text-sm", T.text)}>{t("Two-factor authentication")}</div>
+              <div className={cn("text-xs", T.mutedText)}>{t("Add an extra step when signing in.")}</div>
             </div>
             <Switch checked={twoFA} onChange={setTwoFA} T={T} />
           </div>
@@ -1087,15 +1214,35 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
       </section>
 
       <section className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
-        <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>Preferences</h3>
+        <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>{t("Preferences")}</h3>
         <div className="space-y-4">
+          <div>
+            <div className={cn("text-sm", T.text)}>{t("Language")}</div>
+            <div className={cn("mb-2 text-xs", T.mutedText)}>{t("Choose the language used across the app.")}</div>
+            <div className="flex gap-2">
+              {LANGUAGES.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  aria-pressed={lang === opt.id}
+                  onClick={() => setLang(opt.id)}
+                  className={cn(
+                    "flex-1 rounded-lg border py-2.5 text-sm transition-colors",
+                    lang === opt.id ? cn("border-red-600", T.accent) : cn(T.border, T.subtext, T.hoverBg)
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className={cn("rounded-lg border px-3 py-2.5 text-sm", T.border, T.subtext)}>
-            Currency: <span className={cn("font-data", T.text)}>IDR — Indonesian Rupiah</span>
+            {t("Currency:")} <span className={cn("font-data", T.text)}>{t("IDR — Indonesian Rupiah")}</span>
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <div className={cn("text-sm", T.text)}>Monthly health check emails</div>
-              <div className={cn("text-xs", T.mutedText)}>A summary of your metrics, once a month.</div>
+              <div className={cn("text-sm", T.text)}>{t("Monthly health check emails")}</div>
+              <div className={cn("text-xs", T.mutedText)}>{t("A summary of your metrics, once a month.")}</div>
             </div>
             <Switch checked={notifEmail} onChange={setNotifEmail} T={T} />
           </div>
@@ -1103,16 +1250,16 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
       </section>
 
       <section className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
-        <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>Data</h3>
+        <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>{t("Data")}</h3>
         <div className="flex flex-wrap gap-3">
           <button onClick={exportData} className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm", T.border, T.text, T.hoverBg)}>
-            <Download size={14} /> Export data (JSON)
+            <Download size={14} /> {t("Export data (JSON)")}
           </button>
           <button
             onClick={() => confirmDelete ? onDeleteAccount() : setConfirmDelete(true)}
-            className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm", confirmDelete ? "border-red-600 bg-red-600/10 text-red-400" : "border-red-900/50 text-red-400 hover:bg-red-950/30")}
+            className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm", confirmDelete ? cn("border-red-600 bg-red-600/10", T.accent) : cn(T.dangerBorder, T.accent, T.dangerHover))}
           >
-            <Trash2 size={14} /> {confirmDelete ? "Click again to confirm" : "Delete account"}
+            <Trash2 size={14} /> {confirmDelete ? t("Click again to confirm") : t("Delete account")}
           </button>
         </div>
       </section>
@@ -1125,9 +1272,8 @@ function SettingsPage({ theme, setTheme, user, setUser, profile, setProfile, met
 /* ---------------------------------------------------------------------- */
 
 function ChatPage({ metrics, fireData, T }) {
-  const [messages, setMessages] = useState([
-    { role: "assistant", content: "Hi, I'm your Wealthify AI Coach. Ask me anything about your numbers, or pick a suggestion below to get started." },
-  ]);
+  const { t, lang } = useLang();
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef(null);
@@ -1146,7 +1292,7 @@ function ChatPage({ metrics, fireData, T }) {
       ? `User's current anonymized financial snapshot — monthly income: ${formatCurrency(metrics.monthlyIncome)}, monthly expenses: ${formatCurrency(metrics.monthlyExpenses)}, savings rate: ${metrics.savingsRate.toFixed(1)}%, debt-to-income ratio: ${metrics.dti.toFixed(1)}%, emergency fund coverage: ${metrics.emergencyFundRatio.toFixed(1)} months, net worth: ${formatCurrency(metrics.netWorth)}, financial health status: ${metrics.healthStatus}, FIRE number: ${formatCurrency(fireData.fireNumber)}, projected financial freedom age: ${fireData.onTrack ? Math.round(fireData.projectedFreedomAge) : "not on track within the modeled horizon"}.`
       : "The user has not completed their financial profile yet.";
 
-    const systemPrompt = `You are the Wealthify AI Financial Coach: a friendly, empathetic, and knowledgeable guide helping a young adult build financial security. ${contextSummary} Personalize answers using these numbers when relevant. Keep replies concise (roughly 3-6 sentences unless the person asks for more detail), warm, practical, and light on jargon (briefly explain any term the first time you use it). You are not a certified financial, legal, or tax advisor — for complex or high-stakes decisions, suggest the person also consult a licensed professional or one of Wealthify's expert advisors.`;
+    const systemPrompt = `You are the Batara Kuwera AI Financial Coach: a friendly, empathetic, and knowledgeable guide helping a young adult build financial security. ${contextSummary} Personalize answers using these numbers when relevant. Keep replies concise (roughly 3-6 sentences unless the person asks for more detail), warm, practical, and light on jargon (briefly explain any term the first time you use it). You are not a certified financial, legal, or tax advisor — for complex or high-stakes decisions, suggest the person also consult a licensed professional or one of Batara Kuwera's expert advisors.${lang === "id" ? " Always reply in Bahasa Indonesia." : ""}`;
 
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1161,9 +1307,9 @@ function ChatPage({ metrics, fireData, T }) {
       });
       const data = await response.json();
       const textBlocks = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-      setMessages((prev) => [...prev, { role: "assistant", content: textBlocks || "I couldn't quite generate a response there — mind trying again?" }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: textBlocks || t("I couldn't quite generate a response there — mind trying again?") }]);
     } catch (err) {
-      setMessages((prev) => [...prev, { role: "assistant", content: "I'm having trouble connecting right now. Please try again in a moment." }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: t("I'm having trouble connecting right now. Please try again in a moment.") }]);
     } finally {
       setLoading(false);
     }
@@ -1172,16 +1318,21 @@ function ChatPage({ metrics, fireData, T }) {
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col">
       <div>
-        <h1 className={cn("font-display text-2xl font-bold", T.text)}>AI Coach</h1>
-        <p className={cn("text-sm", T.subtext)}>Context-aware guidance based on your live financial profile.</p>
+        <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("AI Coach")}</h1>
+        <p className={cn("text-sm", T.subtext)}>{t("Context-aware guidance based on your live financial profile.")}</p>
       </div>
 
-      <div className="my-4 flex items-start gap-2 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2.5 text-xs text-amber-300">
+      <div className={cn("my-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs", T.notice)}>
         <Info size={14} className="mt-0.5 shrink-0" />
-        Wealthify's AI Coach gives educational financial guidance — not certified legal, tax, or investment advice.
+        {t("Batara Kuwera's AI Coach gives educational financial guidance — not certified legal, tax, or investment advice.")}
       </div>
 
       <div className={cn("flex-1 space-y-3 overflow-y-auto rounded-2xl border p-4", T.panel, T.cardBorder)} style={{ minHeight: 320, maxHeight: 460 }}>
+        <div className="flex justify-start">
+          <div style={{ maxWidth: "85%" }} className={cn("whitespace-pre-wrap rounded-2xl border px-3.5 py-2.5 text-sm", T.border, T.text)}>
+            {t("Hi, I'm your Batara Kuwera AI Coach. Ask me anything about your numbers, or pick a suggestion below to get started.")}
+          </div>
+        </div>
         {messages.map((m, i) => (
           <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
             <div
@@ -1198,7 +1349,7 @@ function ChatPage({ metrics, fireData, T }) {
         {loading && (
           <div className="flex justify-start">
             <div className={cn("flex items-center gap-1.5 rounded-2xl border px-3.5 py-2.5 text-sm", T.border, T.mutedText)}>
-              <Sparkles size={13} className="animate-pulse" /> thinking…
+              <Sparkles size={13} className="animate-pulse" /> {t("thinking…")}
             </div>
           </div>
         )}
@@ -1207,8 +1358,8 @@ function ChatPage({ metrics, fireData, T }) {
 
       <div className="mt-3 flex flex-wrap gap-2">
         {PROMPT_SUGGESTIONS.map((s) => (
-          <button key={s} onClick={() => send(s)} disabled={loading} className={cn("rounded-full border px-3 py-1.5 text-xs transition-colors", T.border, T.subtext, T.hoverBg)}>
-            {s}
+          <button key={s} onClick={() => send(t(s))} disabled={loading} className={cn("rounded-full border px-3 py-1.5 text-xs transition-colors", T.border, T.subtext, T.hoverBg)}>
+            {t(s)}
           </button>
         ))}
       </div>
@@ -1217,7 +1368,7 @@ function ChatPage({ metrics, fireData, T }) {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about your savings, debt, or FIRE date…"
+          placeholder={t("Ask about your savings, debt, or FIRE date…")}
           className={cn("flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none focus:border-red-600", T.inputBg, T.inputBorder, T.text)}
         />
         <button type="submit" disabled={loading} className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50">
@@ -1232,17 +1383,63 @@ function ChatPage({ metrics, fireData, T }) {
 /*  Root app                                                               */
 /* ---------------------------------------------------------------------- */
 
+function loadInitialState() {
+  const session = readSession();
+  const account = loadAccount() || {};
+  const prefs = loadPrefs();
+  const hasProfile = !!account.hasProfile;
+  return {
+    session,
+    page: !session ? "login" : hasProfile ? "dashboard" : "onboarding",
+    user: { fullName: "", email: "", ...(account.user || {}) },
+    profile: { ...emptyProfile(), ...(account.profile || {}) },
+    hasProfile,
+    subscriptionTier: account.subscriptionTier ?? null,
+    theme: ["dark", "light", "system"].includes(prefs.theme) ? prefs.theme : "dark",
+    lang: LANGUAGES.some((l) => l.id === prefs.lang) ? prefs.lang : "en",
+  };
+}
+
 export default function App() {
-  const [page, setPage] = useState("login");
+  const [init] = useState(loadInitialState);
+  const [page, setPage] = useState(init.page);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [user, setUser] = useState({ fullName: "", email: "" });
-  const [profile, setProfile] = useState(emptyProfile());
-  const [hasProfile, setHasProfile] = useState(false);
-  const [theme, setTheme] = useState("dark");
-  const [subscriptionTier, setSubscriptionTier] = useState(null);
+  const [session, setSession] = useState(init.session);
+  const [user, setUser] = useState(init.user);
+  const [profile, setProfile] = useState(init.profile);
+  const [hasProfile, setHasProfile] = useState(init.hasProfile);
+  const [theme, setTheme] = useState(init.theme);
+  const [lang, setLang] = useState(init.lang);
+  const [subscriptionTier, setSubscriptionTier] = useState(init.subscriptionTier);
   const [toast, setToast] = useState(null);
 
-  const showToast = (msg) => { setToast(msg); window.clearTimeout(showToast._t); showToast._t = window.setTimeout(() => setToast(null), 3200); };
+  const langValue = useMemo(() => ({ lang, t: makeT(lang), fmt: makeFmt(lang) }), [lang]);
+
+  const showToast = (key, vars) => { setToast({ key, vars }); window.clearTimeout(showToast._t); showToast._t = window.setTimeout(() => setToast(null), 3200); };
+
+  useEffect(() => {
+    savePrefs({ theme, lang });
+    document.documentElement.lang = lang;
+  }, [theme, lang]);
+
+  useEffect(() => {
+    if (!hasProfile && !user.email && !user.fullName) clearAccount();
+    else saveAccount({ user, profile, hasProfile, subscriptionTier });
+  }, [user, profile, hasProfile, subscriptionTier]);
+
+  useEffect(() => {
+    if (!session) return undefined;
+    const expire = () => {
+      endSession();
+      setSession(null);
+      setPage("login");
+      showToast("Your session has expired. Please sign in again.");
+    };
+    const remaining = session.expiresAt - Date.now();
+    if (remaining <= 0) { expire(); return undefined; }
+    const id = window.setTimeout(expire, remaining);
+    return () => window.clearTimeout(id);
+  }, [session]);
 
   const metrics = useMemo(() => computeMetrics(profile), [profile]);
   const fireData = useMemo(() => computeFireProjection(profile, metrics), [profile, metrics]);
@@ -1255,19 +1452,25 @@ export default function App() {
   const T = effectiveTheme === "light" ? LIGHT_TOKENS : DARK_TOKENS;
 
   // Returning users keep their saved profile and go straight to the dashboard.
-  const handleLogin = (email) => {
+  const handleLogin = (email, remember) => {
+    setSession(startSession(email, remember));
     setUser((u) => ({ ...u, email }));
     if (hasProfile) {
       setPage("dashboard");
-      showToast("Welcome back" + (profile.fullName ? ", " + profile.fullName.split(" ")[0] : "") + ".");
+      const first = profile.fullName ? profile.fullName.split(" ")[0] : "";
+      if (first) showToast("Welcome back, {name}.", { name: first });
+      else showToast("Welcome back.");
     } else {
       setPage("onboarding");
     }
   };
 
   const handleRegister = (form) => {
+    setSession(startSession(form.email, false));
     setUser({ fullName: form.fullName, email: form.email });
-    setProfile((p) => ({ ...p, fullName: form.fullName }));
+    setProfile({ ...emptyProfile(), fullName: form.fullName });
+    setHasProfile(false);
+    setSubscriptionTier(null);
     setPage("onboarding");
   };
 
@@ -1278,9 +1481,15 @@ export default function App() {
     showToast("Profile saved — your dashboard is ready.");
   };
 
-  const handleLogout = () => setPage("login");
+  const handleLogout = () => {
+    endSession();
+    setSession(null);
+    setPage("login");
+  };
 
   const handleDeleteAccount = () => {
+    endSession();
+    setSession(null);
     setUser({ fullName: "", email: "" });
     setProfile(emptyProfile());
     setHasProfile(false);
@@ -1290,7 +1499,16 @@ export default function App() {
 
   const AUTHED_PAGES = ["dashboard", "experts", "subscription", "settings", "chat"];
 
+  // Paint the page itself (not just the app) so refresh and overscroll never flash white.
+  // Login, register and onboarding are always dark; only the signed-in pages follow the theme.
+  const pageIsLight = effectiveTheme === "light" && AUTHED_PAGES.includes(page);
+  useEffect(() => {
+    document.documentElement.style.backgroundColor = pageIsLight ? "#fafafa" : "#09090b";
+    document.documentElement.style.colorScheme = pageIsLight ? "light" : "dark";
+  }, [pageIsLight]);
+
   return (
+    <LangContext.Provider value={langValue}>
     <div className="min-h-screen w-full font-sans">
       <FontStyles />
 
@@ -1303,12 +1521,13 @@ export default function App() {
           {page === "dashboard" && <DashboardPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
           {page === "experts" && <ExpertsPage subscriptionTier={subscriptionTier} showToast={showToast} setPage={setPage} T={T} />}
           {page === "subscription" && <SubscriptionPage subscriptionTier={subscriptionTier} setSubscriptionTier={setSubscriptionTier} showToast={showToast} T={T} />}
-          {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} onDeleteAccount={handleDeleteAccount} showToast={showToast} T={T} />}
+          {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} onDeleteAccount={handleDeleteAccount} showToast={showToast} T={T} />}
           {page === "chat" && <ChatPage metrics={metrics} fireData={fireData} T={T} />}
         </AppShell>
       )}
 
-      <Toast message={toast} />
+      <Toast toast={toast} />
     </div>
+    </LangContext.Provider>
   );
 }

@@ -3,7 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wealthify</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <style>html { background-color: #09090b; color-scheme: dark; }</style>
+    <script>
+      // Match the app's background before React loads so a refresh doesn't flash white.
+      (function () {
+        try {
+          var read = function (k) { return JSON.parse(localStorage.getItem(k) || "null") || {}; };
+          var prefs = read("wealthify.prefs");
+          var session = read("wealthify.session");
+          var account = read("wealthify.account");
+          var signedIn = session.expiresAt > Date.now() && account.hasProfile;
+          var theme = prefs.theme === "system"
+            ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+            : prefs.theme;
+          if (signedIn && theme === "light") {
+            document.documentElement.style.backgroundColor = "#fafafa";
+            document.documentElement.style.colorScheme = "light";
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <title>Batara Kuwera</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>
