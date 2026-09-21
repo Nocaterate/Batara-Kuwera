@@ -17,6 +17,7 @@ import {
 } from "./src/session.js";
 import { registerUser, verifyLogin, userExists, loadAccount, saveAccount, deleteUser, PASSWORD_RULES } from "./src/auth.js";
 import { cn } from "./src/ui.js";
+import SoftWrap from "./src/SoftWrap.jsx";
 import { addPeriod } from "./src/payments.js";
 import CheckoutModal from "./src/Checkout.jsx";
 import CancelPlanModal from "./src/CancelPlan.jsx";
@@ -552,16 +553,6 @@ function AllocationChart({ data, savingsRate, T }) {
       </ul>
     </div>
   );
-}
-
-// Lets an amount like Rp160.000.000 break after each thousands dot instead of overflowing its box.
-function SoftWrap({ children }) {
-  return String(children).split(".").map((part, i, all) => (
-    <React.Fragment key={i}>
-      {part}
-      {i < all.length - 1 && <>.<wbr /></>}
-    </React.Fragment>
-  ));
 }
 
 function StatCard({ icon: Icon, label, info, value, sub, tone = "default", T }) {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { ArrowRight, Check, ChevronLeft, Clock, CreditCard, Info, Lock, QrCode, X } from "lucide-react";
 import { useLang } from "./i18n.js";
 import Modal from "./Modal.jsx";
+import SoftWrap from "./SoftWrap.jsx";
 import { cn } from "./ui.js";
 import {
   BRAND_LABEL, buildQrisPayload, cardDigits, detectBrand, formatCardNumber, formatExpiry, makeReference, validateCard,
@@ -68,7 +69,7 @@ function Row({ label, value, accent }) {
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <span className={accent ? "text-emerald-400" : "text-zinc-400"}>{label}</span>
-      <span className={cn("shrink-0 font-data", accent ? "text-emerald-400" : "text-zinc-100")}>{value}</span>
+      <span className={cn("whitespace-nowrap font-data", accent ? "text-emerald-400" : "text-zinc-100")}>{value}</span>
     </div>
   );
 }
@@ -93,9 +94,9 @@ function Summary({ order, formatMoney }) {
           {order.isUpgrade && <Row label={t("Credit from {plan}", { plan: order.fromName })} value={"−" + formatMoney(order.credit)} accent />}
         </div>
 
-        <div className="flex items-end justify-between gap-3 py-4">
-          <span className="text-sm text-zinc-400">{t("Total due today")}</span>
-          <span className="break-all text-right font-data text-2xl font-bold [overflow-wrap:anywhere]">{formatMoney(order.amount)}</span>
+        <div className="py-4">
+          <div className="text-sm text-zinc-400">{t("Total due today")}</div>
+          <div className="mt-1 font-data text-3xl font-bold [overflow-wrap:anywhere]"><SoftWrap>{formatMoney(order.amount)}</SoftWrap></div>
         </div>
 
         <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs leading-relaxed text-zinc-300">
