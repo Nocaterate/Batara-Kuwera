@@ -5,7 +5,7 @@ import {
   PiggyBank, CreditCard, LayoutDashboard, Users, Settings as SettingsIcon,
   MessageSquare, LogOut, Sun, Moon, Monitor, ChevronRight, ChevronLeft, Check,
   AlertTriangle, Download, Trash2, Send, Star, Eye, EyeOff, Info, Menu, X,
-  Sparkles, Github,
+  Sparkles, Github, Lock,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Sector, ResponsiveContainer, ComposedChart, Area, Line,
@@ -21,6 +21,8 @@ import SoftWrap from "./src/SoftWrap.jsx";
 import { addPeriod } from "./src/payments.js";
 import CheckoutModal from "./src/Checkout.jsx";
 import CancelPlanModal from "./src/CancelPlan.jsx";
+import ScheduleModal, { specialtyIsProOnly } from "./src/Schedule.jsx";
+import { generateFinancialReportPdf } from "./src/pdfReport.js";
 
 /* ---------------------------------------------------------------------- */
 /*  Fonts / tokens                                                         */
@@ -147,8 +149,6 @@ const EXPERTS = [
   { id: 5, name: "Elena Santoso", cert: "CFP®", years: 14, bio: "Plans for major purchases, education costs, and multi-decade retirement runway.", specialties: ["Retirement", "Real Estate"], rating: 4.9 },
   { id: 6, name: "Rio Prasetyo", cert: "CFA", years: 5, bio: "Entry-level friendly — gets new earners to a solid financial foundation fast.", specialties: ["Budgeting", "Debt Payoff"], rating: 4.5 },
 ];
-
-const RESTRICTED_SPECIALTIES = ["Stocks", "Crypto", "Real Estate"];
 
 const TIERS = [
   {
@@ -1079,15 +1079,24 @@ function DashboardPage({ profile, metrics, fireData, T }) {
 /*  Experts page                                                           */
 /* ---------------------------------------------------------------------- */
 
-function canBookExpert(expert, tier) {
+// Booking itself just needs a paid plan; which consultation types are available is decided
+// inside the scheduling modal (Standard vs Pro), per expert and per type.
+function canBookExpert(tier) {
   if (!tier || tier === "ai") return { allowed: false, reason: "Upgrade to Expert Standard or Pro to book sessions." };
-  const needsPro = expert.specialties.some((s) => RESTRICTED_SPECIALTIES.includes(s));
-  if (needsPro && tier !== "pro") return { allowed: false, reason: "This specialist requires the Expert Pro plan." };
   return { allowed: true, reason: "" };
 }
 
 function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const [scheduling, setScheduling] = useState(null);
+
+  const handleBooked = (info) => {
+    const when = info.day.toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { day: "numeric", month: "long" });
+    showToast("Session request sent to {name} for {when} at {time}. They'll reach out within 24 hours.", {
+      name: info.expertName, when, time: `${String(info.hour).padStart(2, "0")}:00`,
+    });
+  };
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
@@ -1097,7 +1106,7 @@ function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {EXPERTS.map((ex) => {
-          const gate = canBookExpert(ex, subscriptionTier);
+          const gate = canBookExpert(subscriptionTier);
           return (
             <div key={ex.id} className={cn("flex flex-col rounded-2xl border p-5", T.panel, T.cardBorder)}>
               <div className="flex items-center gap-3">
@@ -1112,14 +1121,17 @@ function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
               </div>
               <p className={cn("mt-3 flex-1 text-sm", T.subtext)}>{t(ex.bio)}</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {ex.specialties.map((s) => (
-                  <span key={s} className={cn("rounded-md border px-2 py-0.5 font-data text-xs", T.border, T.mutedText)}>{t(s)}</span>
-                ))}
+                {ex.specialties.map((s) => {
+                  const locked = subscriptionTier !== "pro" && specialtyIsProOnly(s);
+                  return (
+                    <span key={s} className={cn("inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-data text-xs", T.border, T.mutedText)}>
+                      {locked && <Lock size={10} />} {t(s)}
+                    </span>
+                  );
+                })}
               </div>
               <button
-                onClick={() => gate.allowed
-                  ? showToast("Session request sent to {name}. They'll reach out within 24 hours.", { name: ex.name })
-                  : (showToast(gate.reason), setPage("subscription"))}
+                onClick={() => gate.allowed ? setScheduling(ex) : (showToast(gate.reason), setPage("subscription"))}
                 className={cn(
                   "mt-4 rounded-lg py-2 text-sm font-semibold transition-colors",
                   gate.allowed ? "bg-red-600 text-white hover:bg-red-500" : cn("border", T.border, T.subtext, T.hoverBg)
@@ -1131,6 +1143,16 @@ function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
           );
         })}
       </div>
+
+      {scheduling && (
+        <ScheduleModal
+          expert={scheduling}
+          tier={subscriptionTier}
+          T={T}
+          onClose={() => setScheduling(null)}
+          onBooked={handleBooked}
+        />
+      )}
     </div>
   );
 }
@@ -1338,7 +1360,7 @@ function SubscriptionPage({ subscription, setSubscription, setPage, T }) {
 /*  Settings page                                                          */
 /* ---------------------------------------------------------------------- */
 
-function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setProfile, metrics, onDeleteAccount, showToast, T }) {
+function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setProfile, metrics, fireData, onDeleteAccount, showToast, T }) {
   const { t, fmt, lang } = useLang();
   const [notifEmail, setNotifEmail] = useState(true);
   const [twoFA, setTwoFA] = useState(false);
@@ -1355,15 +1377,10 @@ function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setPro
     showToast("Financial info updated — your dashboard has been recalculated.");
   };
 
-  const exportData = () => {
+  const exportReport = () => {
     try {
-      const blob = new Blob([JSON.stringify({ user, profile }, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = "batara-kuwera-financial-data.json";
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast("Your data export has started downloading.");
+      generateFinancialReportPdf({ user, profile, metrics, fireData, lang, t, fmt, formatCurrency, logoSrc: LOGO_SRC });
+      showToast("Your financial report has started downloading.");
     } catch {
       showToast("Export failed — please try again.");
     }
@@ -1545,8 +1562,8 @@ function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setPro
       <section className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
         <h3 className={cn("mb-4 font-display text-sm font-semibold", T.text)}>{t("Data")}</h3>
         <div className="flex flex-wrap gap-3">
-          <button onClick={exportData} className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm", T.border, T.text, T.hoverBg)}>
-            <Download size={14} /> {t("Export data (JSON)")}
+          <button onClick={exportReport} className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm", T.border, T.text, T.hoverBg)}>
+            <Download size={14} /> {t("Export report (PDF)")}
           </button>
           <button
             onClick={() => confirmDelete ? onDeleteAccount() : setConfirmDelete(true)}
@@ -1853,7 +1870,7 @@ export default function App() {
           {page === "dashboard" && <DashboardPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
           {page === "experts" && <ExpertsPage subscriptionTier={subscription.tier} showToast={showToast} setPage={setPage} T={T} />}
           {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} T={T} />}
-          {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} onDeleteAccount={handleDeleteAccount} showToast={showToast} T={T} />}
+          {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} T={T} />}
           {page === "chat" && <ChatPage metrics={metrics} fireData={fireData} T={T} />}
         </AppShell>
       )}
