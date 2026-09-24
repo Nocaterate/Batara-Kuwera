@@ -56,3 +56,29 @@ export function sha256(bytes) {
   [h0, h1, h2, h3, h4, h5, h6, h7].forEach((v, i) => outView.setUint32(i * 4, v >>> 0));
   return out;
 }
+
+function hmacSha256(keyBytes, message) {
+  const key = new Uint8Array(64);
+  key.set(keyBytes.length > 64 ? sha256(keyBytes) : keyBytes);
+  const inner = new Uint8Array(64 + message.length);
+  const outer = new Uint8Array(64 + 32);
+  for (let i = 0; i < 64; i++) { inner[i] = key[i] ^ 0x36; outer[i] = key[i] ^ 0x5c; }
+  inner.set(message, 64);
+  outer.set(sha256(inner), 64);
+  return sha256(outer);
+}
+
+// PBKDF2-HMAC-SHA256 (single 32-byte block). Only used to verify accounts created by the earlier
+// crypto.subtle implementation when SubtleCrypto isn't available; slow (100k iterations) by design.
+export function pbkdf2Sha256(passwordBytes, saltBytes, iterations) {
+  const first = new Uint8Array(saltBytes.length + 4);
+  first.set(saltBytes);
+  first[first.length - 1] = 1; // block index 1, big-endian
+  let u = hmacSha256(passwordBytes, first);
+  const result = u.slice();
+  for (let i = 1; i < iterations; i++) {
+    u = hmacSha256(passwordBytes, u);
+    for (let j = 0; j < 32; j++) result[j] ^= u[j];
+  }
+  return result;
+}
