@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { LangContext, useLang, makeT, makeFmt, LANGUAGES } from "./src/i18n.js";
 import {
-  readSession, startSession, endSession, loadPrefs, savePrefs,
+  readSession, startSession, endSession, loadPrefs, savePrefs, isStorageWorking,
 } from "./src/session.js";
 import { registerUser, verifyLogin, userExists, loadAccount, saveAccount, deleteUser, PASSWORD_RULES } from "./src/auth.js";
 import { cn } from "./src/ui.js";
@@ -600,6 +600,10 @@ function HealthBadge({ status, size = "sm", T }) {
 /* ---------------------------------------------------------------------- */
 
 function AuthShell({ children }) {
+  const { t } = useLang();
+  // Checked once per mount (login/register page load) so the warning shows up front, before
+  // someone registers, gets a false "success", and then can't find the account on login.
+  const [storageOk] = useState(isStorageWorking);
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950 px-4 py-10">
       <div
@@ -616,6 +620,12 @@ function AuthShell({ children }) {
           <img src={LOGO_SRC} alt="Batara Kuwera" className="h-9 w-9 rounded-lg object-cover" />
           <span className="font-display text-xl font-bold tracking-tight text-zinc-100">BATARA KUWERA</span>
         </div>
+        {!storageOk && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-800/50 bg-amber-950/30 px-3.5 py-3 text-xs text-amber-300">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <span>{t("This browser is blocking saved data (private browsing, or cookies/storage disabled), so accounts made here won't be remembered. Try a normal browser window.")}</span>
+          </div>
+        )}
         {children}
       </div>
     </div>
@@ -1816,7 +1826,11 @@ export default function App() {
     let result;
     try { result = await registerUser(form); }
     catch { return "Something went wrong. Please try again."; }
-    if (!result.ok) return "An account with this email already exists. Please log in.";
+    if (!result.ok) {
+      return result.error === "STORAGE_UNAVAILABLE"
+        ? "Your browser is blocking saved data (private browsing, or cookies/storage disabled for this site), so an account can't be created here. Try a normal browser window, or allow storage for this site."
+        : "An account with this email already exists. Please log in.";
+    }
 
     // No auto sign-in: the new user logs in manually, then lands in onboarding.
     setPage("login");

@@ -52,6 +52,8 @@ const ID = {
   "No account found for this email. Please register first.": "Akun dengan email ini tidak ditemukan. Silakan daftar terlebih dahulu.",
   "Incorrect password.": "Kata sandi salah.",
   "An account with this email already exists. Please log in.": "Akun dengan email ini sudah terdaftar. Silakan masuk.",
+  "Your browser is blocking saved data (private browsing, or cookies/storage disabled for this site), so an account can't be created here. Try a normal browser window, or allow storage for this site.": "Browser kamu memblokir penyimpanan data (mode penyamaran, atau cookie/penyimpanan dinonaktifkan untuk situs ini), sehingga akun tidak dapat dibuat di sini. Coba gunakan jendela browser biasa, atau izinkan penyimpanan untuk situs ini.",
+  "This browser is blocking saved data (private browsing, or cookies/storage disabled), so accounts made here won't be remembered. Try a normal browser window.": "Browser ini memblokir penyimpanan data (mode penyamaran, atau cookie/penyimpanan dinonaktifkan), sehingga akun yang dibuat di sini tidak akan tersimpan. Coba gunakan jendela browser biasa.",
   "Something went wrong. Please try again.": "Terjadi kesalahan. Silakan coba lagi.",
 
   // Register

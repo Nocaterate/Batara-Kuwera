@@ -12,9 +12,25 @@ export const readJSON = (key) => {
     return null;
   }
 };
+// Returns whether the write actually happened — private browsing, blocked storage, disabled
+// cookies, or a full quota can make setItem throw (caught here) or silently no-op (not an
+// exception at all), so callers that must not lie about success should check this.
 export const writeJSON = (key, value) => {
-  try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
+  try { window.localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
 };
+
+// A one-off, cheap probe for whether localStorage genuinely persists in this browser right now.
+export function isStorageWorking() {
+  const probeKey = "batara-kuwera.__probe__";
+  try {
+    window.localStorage.setItem(probeKey, "1");
+    const ok = window.localStorage.getItem(probeKey) === "1";
+    window.localStorage.removeItem(probeKey);
+    return ok;
+  } catch {
+    return false;
+  }
+}
 const remove = (key) => {
   try { window.localStorage.removeItem(key); } catch { /* storage unavailable */ }
 };

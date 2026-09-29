@@ -56,6 +56,10 @@ export async function registerUser({ fullName, email, password }) {
   if (users[id]) return { ok: false, error: "EXISTS" };
   users[id] = { email: id, fullName, salt, hash, v: HASH_VERSION, createdAt: Date.now() };
   writeJSON(USERS_KEY, users);
+  // Read back to confirm the browser actually kept it — some contexts (private browsing, blocked
+  // storage, third-party storage partitioning) let setItem throw-and-get-swallowed or silently
+  // no-op, which would otherwise look like a successful registration that then can't be found.
+  if (loadUsers()[id]?.hash !== hash) return { ok: false, error: "STORAGE_UNAVAILABLE" };
   return { ok: true, email: id };
 }
 
