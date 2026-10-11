@@ -6,6 +6,19 @@ const PAGE_W = 210; // A4, mm
 const MARGIN = 16;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
+// A data: URL passes through unchanged; a path (e.g. "/logo.png") is fetched and inlined, since
+// jsPDF's addImage needs actual image bytes, not a URL it can follow itself.
+async function toDataUrl(src) {
+  if (src.startsWith("data:")) return src;
+  const blob = await fetch(src).then((r) => r.blob());
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 const COLOR = {
   brand: [220, 38, 38],        // red-600
   brandDark: [153, 27, 27],    // red-800
@@ -73,28 +86,31 @@ function sectionTitle(doc, y, text) {
  * @param {(key:string, vars?:object) => string} p.t - translator (already resolves to the current language)
  * @param {(value:number, digits?:number) => string} p.fmt - locale-aware number formatter (no currency symbol)
  * @param {(value:number) => string} p.formatCurrency - e.g. "Rp1.500.000"
- * @param {string} p.logoSrc - data: URL of the app logo (PNG)
+ * @param {string} p.logoSrc - path or data: URL of the app logo (PNG); fetched and inlined if it's a path
  */
-export function generateFinancialReportPdf({ user, profile, metrics, fireData, lang, t, fmt, formatCurrency, logoSrc }) {
+export async function generateFinancialReportPdf({ user, profile, metrics, fireData, lang, t, fmt, formatCurrency, logoSrc }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const locale = lang === "id" ? "id-ID" : "en-US";
   const today = new Date();
   const dateStr = today.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
   const displayName = profile.fullName || user.fullName || t("Guest");
 
+  // jsPDF's addImage needs actual image data, not a URL — fetch the public asset once and inline it.
+  const logoDataUrl = logoSrc ? await toDataUrl(logoSrc).catch(() => null) : null;
+
   // ---- Header band ----
   doc.setFillColor(...COLOR.brand);
   doc.rect(0, 0, PAGE_W, 30, "F");
-  if (logoSrc) {
-    try { doc.addImage(logoSrc, "PNG", MARGIN, 6, 18, 18, undefined, "FAST"); } catch { /* ignore a bad/undecodable logo */ }
+  if (logoDataUrl) {
+    try { doc.addImage(logoDataUrl, "PNG", MARGIN, 6, 18, 18, undefined, "FAST"); } catch { /* ignore a bad/undecodable logo */ }
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   setColor(doc, "setTextColor", COLOR.white);
-  doc.text("BATARA KUWERA", logoSrc ? MARGIN + 22 : MARGIN, 15);
+  doc.text("BATARA KUWERA", logoDataUrl ? MARGIN + 22 : MARGIN, 15);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
-  doc.text(t("Personal Financial Snapshot"), logoSrc ? MARGIN + 22 : MARGIN, 21.5);
+  doc.text(t("Personal Financial Snapshot"), logoDataUrl ? MARGIN + 22 : MARGIN, 21.5);
   doc.setFontSize(8.5);
   doc.text(dateStr, PAGE_W - MARGIN, 15, { align: "right" });
   doc.text(displayName, PAGE_W - MARGIN, 21.5, { align: "right" });
@@ -191,7 +207,7 @@ export function generateFinancialReportPdf({ user, profile, metrics, fireData, l
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
       setColor(doc, "setTextColor", COLOR.subink);
-      const pct = ((a.value / allocTotal) * 100).toFixed(1);
+      const pct = fmt((a.value / allocTotal) * 100);
       doc.text(`${a.label} — ${pct}% (${formatCurrency(a.value)})`, x + 5, ly);
     });
     y += Math.ceil(allocation.length / 2) * 6 + 8;
@@ -228,7 +244,7 @@ export function generateFinancialReportPdf({ user, profile, metrics, fireData, l
   doc.setFontSize(8.5);
   setColor(doc, "setTextColor", COLOR.subink);
   doc.text(`${t("FIRE target")}: ${formatCurrency(fireData.fireNumber)}`, MARGIN, y);
-  doc.text(`${(fireProgress * 100).toFixed(1)}% ${t("of target")}`, PAGE_W - MARGIN, y, { align: "right" });
+  doc.text(`${fmt(fireProgress * 100)}% ${t("of target")}`, PAGE_W - MARGIN, y, { align: "right" });
   y += 10;
 
   // ---- Footer ----

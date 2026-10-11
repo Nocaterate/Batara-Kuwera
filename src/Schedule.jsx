@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { useLang } from "./i18n.js";
 import Modal from "./Modal.jsx";
+import Avatar from "./Avatar.jsx";
 import { cn } from "./ui.js";
 
 const DAY_COUNT = 10;
@@ -81,9 +82,7 @@ function Stepper({ current, T }) {
 function ExpertHeader({ expert, T }) {
   return (
     <div className="mb-5 flex items-center gap-3">
-      <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600/15 font-display text-sm font-semibold", T.accent)}>
-        {expert.name.split(" ").map((n) => n[0]).join("")}
-      </div>
+      <Avatar name={expert.name} photo={expert.photo} size={44} T={T} />
       <div className="min-w-0">
         <div className={cn("truncate text-sm font-semibold", T.text)}>{expert.name}</div>
         <div className={cn("font-data text-xs", T.subtext)}>{expert.cert} · {expert.years}</div>

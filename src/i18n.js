@@ -1,4 +1,7 @@
 import { createContext, useContext } from "react";
+import { makeMoney } from "./numberFormat.js";
+
+export { makeMoney };
 
 export const LANGUAGES = [
   { id: "en", label: "English" },
@@ -150,12 +153,15 @@ const ID = {
 
   // Experts
   "Certified planners and advisors, matched to what you need help with.": "Perencana dan penasihat bersertifikat, disesuaikan dengan bantuan yang kamu butuhkan.",
-  "Builds budgeting systems and debt payoff plans for early-career earners.": "Menyusun sistem penganggaran dan rencana pelunasan utang untuk pekerja di awal karier.",
-  "Designs long-horizon portfolios and translates goals into asset allocation.": "Merancang portofolio jangka panjang dan menerjemahkan tujuan menjadi alokasi aset.",
-  "Specializes in tax-efficient planning for multi-income households.": "Ahli dalam perencanaan pajak yang efisien untuk rumah tangga dengan beberapa sumber pendapatan.",
-  "Helps clients build their first crypto and alternative-asset allocation responsibly.": "Membantu klien menyusun alokasi kripto dan aset alternatif pertama mereka secara bertanggung jawab.",
-  "Plans for major purchases, education costs, and multi-decade retirement runway.": "Merencanakan pembelian besar, biaya pendidikan, dan masa pensiun puluhan tahun.",
+  "Helps young professionals build a budget that survives payday to payday, and pay off debt without burning out.": "Membantu para profesional muda menyusun anggaran yang bertahan dari gajian ke gajian, dan melunasi utang tanpa membuat kewalahan.",
+  "Builds long-horizon stock portfolios and retirement plans for Indonesia's growing middle class.": "Menyusun portofolio saham jangka panjang dan rencana pensiun untuk kelas menengah Indonesia yang terus berkembang.",
+  "Untangles tax obligations for freelancers and dual-income households, alongside everyday budgeting.": "Mengurai kewajiban pajak untuk freelancer dan rumah tangga berpenghasilan ganda, sekaligus penganggaran sehari-hari.",
+  "Guides first-time crypto and stock investors toward a responsible, risk-aware allocation.": "Membimbing investor kripto dan saham pemula menuju alokasi yang bertanggung jawab dan sadar risiko.",
+  "Plans for retirement, education costs, and property purchases across multi-decade horizons.": "Merencanakan pensiun, biaya pendidikan, dan pembelian properti untuk jangka waktu puluhan tahun.",
   "Entry-level friendly — gets new earners to a solid financial foundation fast.": "Ramah untuk pemula — membantu pekerja baru membangun fondasi keuangan yang kokoh dengan cepat.",
+  "Advises tech workers and young professionals on building diversified crypto and equity portfolios.": "Memberi saran kepada pekerja teknologi dan profesional muda dalam membangun portofolio kripto dan saham yang terdiversifikasi.",
+  "Combines tax-efficient planning with retirement strategy for professionals nearing their peak earning years.": "Menggabungkan perencanaan pajak yang efisien dengan strategi pensiun untuk profesional yang mendekati puncak penghasilan mereka.",
+  "Guides first-time property buyers through financing, budgeting, and long-term real estate equity building.": "Membimbing pembeli properti pertama kali dalam pembiayaan, penganggaran, dan membangun ekuitas properti jangka panjang.",
   "Budgeting": "Penganggaran",
   "Debt Payoff": "Pelunasan Utang",
   "Stocks": "Saham",
@@ -286,6 +292,7 @@ const ID = {
   "Payment": "Pembayaran",
   "Done": "Selesai",
   "Close": "Tutup",
+  "Clear": "Hapus",
   "Secure checkout": "Checkout aman",
   "Upgrade to": "Upgrade ke",
   "You're subscribing to": "Kamu berlangganan",
@@ -426,5 +433,5 @@ export const makeT = (lang) => (key, vars) => {
 export const makeFmt = (lang) => (value, digits = 1) =>
   Number(value).toLocaleString(lang === "id" ? "id-ID" : "en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
-export const LangContext = createContext({ lang: "en", t: makeT("en"), fmt: makeFmt("en") });
+export const LangContext = createContext({ lang: "en", t: makeT("en"), fmt: makeFmt("en"), money: makeMoney("en") });
 export const useLang = () => useContext(LangContext);
