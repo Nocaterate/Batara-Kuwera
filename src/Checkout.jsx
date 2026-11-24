@@ -38,6 +38,10 @@ const fmtDate = (ts, lang) =>
 const fmtDateTime = (ts, lang) =>
   new Date(ts).toLocaleString(lang === "id" ? "id-ID" : "en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
+// An order is either a plan (default) or a single expert session (order.kind === "session",
+// with expertName, typeLabel, duration and startsAt).
+const isSessionOrder = (order) => order.kind === "session";
+
 /* ---------------------------------------------------------------------- */
 /*  Small pieces                                                           */
 /* ---------------------------------------------------------------------- */
@@ -76,6 +80,7 @@ function Row({ label, value, accent }) {
 
 function Summary({ order, formatMoney }) {
   const { t, lang } = useLang();
+  const session = isSessionOrder(order);
   return (
     <aside className="relative shrink-0 overflow-hidden bg-zinc-950 p-6 text-zinc-100 md:w-72 md:p-7">
       <div className="pointer-events-none absolute -left-16 -top-16 h-56 w-56 rounded-full bg-red-600/25" style={{ filter: "blur(64px)" }} />
@@ -85,13 +90,21 @@ function Summary({ order, formatMoney }) {
           <Lock size={11} /> {t("Secure checkout")}
         </div>
 
-        <p className="text-xs uppercase tracking-wider text-zinc-400">{order.isUpgrade ? t("Upgrade to") : t("You're subscribing to")}</p>
-        <h3 className="font-display text-2xl font-bold">{order.tierName}</h3>
-        <p className="mb-5 text-sm capitalize text-zinc-400">{t(order.cycle)}</p>
+        <p className="text-xs uppercase tracking-wider text-zinc-400">
+          {session ? t("You're booking a session with") : order.isUpgrade ? t("Upgrade to") : t("You're subscribing to")}
+        </p>
+        <h3 className="font-display text-2xl font-bold">{session ? order.expertName : order.tierName}</h3>
+        <p className={cn("mb-5 text-sm text-zinc-400", !session && "capitalize")}>{session ? t(order.typeLabel) : t(order.cycle)}</p>
 
         <div className="space-y-2 border-y border-white/10 py-4">
-          <Row label={`${order.tierName} · ${t(order.cycle)}`} value={formatMoney(order.fullPrice)} />
-          {order.isUpgrade && <Row label={t("Credit from {plan}", { plan: order.fromName })} value={"−" + formatMoney(order.credit)} accent />}
+          {session ? (
+            <Row label={`${t(order.typeLabel)} · ${order.duration} ${t("min")}`} value={formatMoney(order.fullPrice)} />
+          ) : (
+            <>
+              <Row label={`${order.tierName} · ${t(order.cycle)}`} value={formatMoney(order.fullPrice)} />
+              {order.isUpgrade && <Row label={t("Credit from {plan}", { plan: order.fromName })} value={"−" + formatMoney(order.credit)} accent />}
+            </>
+          )}
         </div>
 
         <div className="py-4">
@@ -102,14 +115,16 @@ function Summary({ order, formatMoney }) {
         <div className="flex items-start gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs leading-relaxed text-zinc-300">
           <Info size={14} className="mt-0.5 shrink-0 text-red-400" />
           <span>
-            {order.isUpgrade
-              ? t("Only the difference is charged. Your plan stays due on {date}.", { date: fmtDate(order.dueDate, lang) })
-              : t("Your plan runs until {date}.", { date: fmtDate(order.dueDate, lang) })}
+            {session
+              ? t("Session on {when}. {name} will confirm within 24 hours.", { when: fmtDateTime(order.startsAt, lang), name: order.expertName })
+              : order.isUpgrade
+                ? t("Only the difference is charged. Your plan stays due on {date}.", { date: fmtDate(order.dueDate, lang) })
+                : t("Your plan runs until {date}.", { date: fmtDate(order.dueDate, lang) })}
           </span>
         </div>
 
         <ul className="mt-5 hidden space-y-2 text-xs text-zinc-400 md:block">
-          {order.features.map((f) => (
+          {(order.features ?? []).map((f) => (
             <li key={f} className="flex items-start gap-2">
               <Check size={13} className="mt-0.5 shrink-0 text-emerald-400" /> {t(f)}
             </li>
@@ -480,13 +495,23 @@ function Success({ order, receipt, formatMoney, onDone, onBrowse, T }) {
   const methodLabel = receipt.method === "card"
     ? `${t("Card")} •••• ${receipt.last4}${BRAND_LABEL[receipt.brand] ? ` (${BRAND_LABEL[receipt.brand]})` : ""}`
     : "QRIS";
-  const rows = [
-    [t("Reference"), receipt.ref],
-    [t("Plan"), `${order.tierName} · ${t(order.cycle)}`],
-    [t("Payment method"), methodLabel],
-    [t("Paid on"), fmtDateTime(receipt.at, lang)],
-    [t("Valid until"), fmtDate(order.dueDate, lang)],
-  ];
+  const session = isSessionOrder(order);
+  const rows = session
+    ? [
+      [t("Reference"), receipt.ref],
+      [t("Expert"), order.expertName],
+      [t("Type"), t(order.typeLabel)],
+      [t("When"), fmtDateTime(order.startsAt, lang)],
+      [t("Payment method"), methodLabel],
+      [t("Paid on"), fmtDateTime(receipt.at, lang)],
+    ]
+    : [
+      [t("Reference"), receipt.ref],
+      [t("Plan"), `${order.tierName} · ${t(order.cycle)}`],
+      [t("Payment method"), methodLabel],
+      [t("Paid on"), fmtDateTime(receipt.at, lang)],
+      [t("Valid until"), fmtDate(order.dueDate, lang)],
+    ];
   return (
     <div className="relative flex flex-col items-center text-center">
       <Confetti />
@@ -500,9 +525,11 @@ function Success({ order, receipt, formatMoney, onDone, onBrowse, T }) {
       </div>
       <h2 className={cn("font-display text-2xl font-bold", T.text)}>{t("Payment successful")}</h2>
       <p className={cn("mt-1 max-w-xs text-sm", T.subtext)}>
-        {order.isUpgrade
-          ? t("Upgrade complete! You're now on {plan}.", { plan: order.tierName })
-          : t("Thank you! Your {plan} plan is now active.", { plan: order.tierName })}
+        {session
+          ? t("Your session with {name} is booked. They'll confirm within 24 hours.", { name: order.expertName })
+          : order.isUpgrade
+            ? t("Upgrade complete! You're now on {plan}.", { plan: order.tierName })
+            : t("Thank you! Your {plan} plan is now active.", { plan: order.tierName })}
       </p>
 
       <div className={cn("relative mt-6 w-full rounded-2xl border p-4 text-left", T.border, T.panelAlt)}>
@@ -524,9 +551,11 @@ function Success({ order, receipt, formatMoney, onDone, onBrowse, T }) {
         <button type="button" onClick={onDone} className="flex-1 rounded-xl bg-gradient-to-r from-red-600 to-red-500 py-3 text-sm font-semibold text-white shadow-lg shadow-red-600/30 transition-all hover:-translate-y-0.5">
           {t("Done")}
         </button>
-        <button type="button" onClick={onBrowse} className={cn("flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors", T.border, T.text, T.hoverBg)}>
-          {t("Browse experts")}
-        </button>
+        {!session && onBrowse && (
+          <button type="button" onClick={onBrowse} className={cn("flex-1 rounded-xl border py-3 text-sm font-semibold transition-colors", T.border, T.text, T.hoverBg)}>
+            {t("Browse experts")}
+          </button>
+        )}
       </div>
     </div>
   );

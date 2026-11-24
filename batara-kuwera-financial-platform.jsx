@@ -5,7 +5,7 @@ import {
   PiggyBank, CreditCard, LayoutDashboard, Users, Settings as SettingsIcon,
   MessageSquare, LogOut, Sun, Moon, Monitor, ChevronRight, ChevronLeft, Check,
   AlertTriangle, Download, Trash2, Send, Star, Eye, EyeOff, Info, Menu, X,
-  Sparkles, Github, Lock,
+  Sparkles, Github,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Sector, ResponsiveContainer, ComposedChart, Area, Line,
@@ -23,7 +23,7 @@ import Avatar from "./src/Avatar.jsx";
 import { addPeriod } from "./src/payments.js";
 import CheckoutModal from "./src/Checkout.jsx";
 import CancelPlanModal from "./src/CancelPlan.jsx";
-import ScheduleModal, { specialtyIsProOnly } from "./src/Schedule.jsx";
+import ScheduleModal, { SESSION_MINUTES, sessionPrice } from "./src/Schedule.jsx";
 import { generateFinancialReportPdf } from "./src/pdfReport.js";
 
 /* ---------------------------------------------------------------------- */
@@ -147,19 +147,21 @@ const glossaryDef = (term) => GLOSSARY.find((g) => g.term === term).def;
 // financial planners (CFP®/QWP®/RFA®/CWM® are real, general Indonesian certifications, not
 // tied to anyone specific) so the roster reads authentically without using anyone's real identity.
 // Each expert's `specialties` must stay within CONSULT_TYPES' vocabulary (src/Schedule.jsx) —
-// that's what decides which consultation types they offer and which ones need Expert Pro.
+// that's what decides which consultation types they offer.
+// `rate` is the expert's per-session price (Rp) for a normal consultation; other types scale it
+// by their factor in CONSULT_TYPES. Senior experts charge more.
 // Photos: free-licensed Unsplash portraits (not photos of the named person — see EXPERTS note
 // above), stored locally under public/experts/. Avatar falls back to initials if one fails to load.
 const EXPERTS = [
-  { id: 1, name: "Budi Santoso", cert: "CFP®", years: 9, bio: "Helps young professionals build a budget that survives payday to payday, and pay off debt without burning out.", specialties: ["Budgeting", "Debt Payoff"], rating: 4.9, photo: "/experts/budi-santoso.jpg" },
-  { id: 2, name: "Andra Kusuma", cert: "CFA, WPPE", years: 12, bio: "Builds long-horizon stock portfolios and retirement plans for Indonesia's growing middle class.", specialties: ["Stocks", "Retirement"], rating: 4.8, photo: "/experts/andra-kusuma.jpg" },
-  { id: 3, name: "Dewi Anggraini", cert: "CFP®, QWP®", years: 7, bio: "Untangles tax obligations for freelancers and dual-income households, alongside everyday budgeting.", specialties: ["Tax Planning", "Budgeting"], rating: 4.7, photo: "/experts/dewi-anggraini.jpg" },
-  { id: 4, name: "Fajar Ramadhan", cert: "CWM®", years: 6, bio: "Guides first-time crypto and stock investors toward a responsible, risk-aware allocation.", specialties: ["Crypto", "Stocks"], rating: 4.6, photo: "/experts/fajar-ramadhan.jpg" },
-  { id: 5, name: "Kartika Wulandari", cert: "CFP®, RFA®", years: 14, bio: "Plans for retirement, education costs, and property purchases across multi-decade horizons.", specialties: ["Retirement", "Real Estate"], rating: 4.9, photo: "/experts/kartika-wulandari.jpg" },
-  { id: 6, name: "Reza Firmansyah", cert: "CFA", years: 5, bio: "Entry-level friendly — gets new earners to a solid financial foundation fast.", specialties: ["Budgeting", "Debt Payoff"], rating: 4.5, photo: "/experts/reza-firmansyah.jpg" },
-  { id: 7, name: "Nadia Puspitasari", cert: "CWM®, WPPE", years: 8, bio: "Advises tech workers and young professionals on building diversified crypto and equity portfolios.", specialties: ["Crypto", "Stocks"], rating: 4.7, photo: "/experts/nadia-puspitasari.jpg" },
-  { id: 8, name: "Hendra Wibowo", cert: "CFP®, QWP®", years: 11, bio: "Combines tax-efficient planning with retirement strategy for professionals nearing their peak earning years.", specialties: ["Tax Planning", "Retirement"], rating: 4.8, photo: "/experts/hendra-wibowo.jpg" },
-  { id: 9, name: "Sinta Maharani", cert: "CFP®, RFA®", years: 6, bio: "Guides first-time property buyers through financing, budgeting, and long-term real estate equity building.", specialties: ["Real Estate", "Budgeting"], rating: 4.6, photo: "/experts/sinta-maharani.jpg" },
+  { id: 1, name: "Budi Santoso", cert: "CFP®", years: 9, bio: "Helps young professionals build a budget that survives payday to payday, and pay off debt without burning out.", specialties: ["Budgeting", "Debt Payoff"], rating: 4.9, rate: 250000, photo: "/experts/budi-santoso.jpg" },
+  { id: 2, name: "Andra Kusuma", cert: "CFA, WPPE", years: 12, bio: "Builds long-horizon stock portfolios and retirement plans for Indonesia's growing middle class.", specialties: ["Stocks", "Retirement"], rating: 4.8, rate: 325000, photo: "/experts/andra-kusuma.jpg" },
+  { id: 3, name: "Dewi Anggraini", cert: "CFP®, QWP®", years: 7, bio: "Untangles tax obligations for freelancers and dual-income households, alongside everyday budgeting.", specialties: ["Tax Planning", "Budgeting"], rating: 4.7, rate: 225000, photo: "/experts/dewi-anggraini.jpg" },
+  { id: 4, name: "Fajar Ramadhan", cert: "CWM®", years: 6, bio: "Guides first-time crypto and stock investors toward a responsible, risk-aware allocation.", specialties: ["Crypto", "Stocks"], rating: 4.6, rate: 200000, photo: "/experts/fajar-ramadhan.jpg" },
+  { id: 5, name: "Kartika Wulandari", cert: "CFP®, RFA®", years: 14, bio: "Plans for retirement, education costs, and property purchases across multi-decade horizons.", specialties: ["Retirement", "Real Estate"], rating: 4.9, rate: 350000, photo: "/experts/kartika-wulandari.jpg" },
+  { id: 6, name: "Reza Firmansyah", cert: "CFA", years: 5, bio: "Entry-level friendly — gets new earners to a solid financial foundation fast.", specialties: ["Budgeting", "Debt Payoff"], rating: 4.5, rate: 175000, photo: "/experts/reza-firmansyah.jpg" },
+  { id: 7, name: "Nadia Puspitasari", cert: "CWM®, WPPE", years: 8, bio: "Advises tech workers and young professionals on building diversified crypto and equity portfolios.", specialties: ["Crypto", "Stocks"], rating: 4.7, rate: 250000, photo: "/experts/nadia-puspitasari.jpg" },
+  { id: 8, name: "Hendra Wibowo", cert: "CFP®, QWP®", years: 11, bio: "Combines tax-efficient planning with retirement strategy for professionals nearing their peak earning years.", specialties: ["Tax Planning", "Retirement"], rating: 4.8, rate: 300000, photo: "/experts/hendra-wibowo.jpg" },
+  { id: 9, name: "Sinta Maharani", cert: "CFP®, RFA®", years: 6, bio: "Guides first-time property buyers through financing, budgeting, and long-term real estate equity building.", specialties: ["Real Estate", "Budgeting"], rating: 4.6, rate: 200000, photo: "/experts/sinta-maharani.jpg" },
 ];
 
 const TIERS = [
@@ -187,6 +189,10 @@ function normalizeSubscription(sub) {
   if (!["monthly", "annual"].includes(sub.cycle) || typeof sub.expiresAt !== "number" || sub.expiresAt <= Date.now()) return FREE_SUBSCRIPTION;
   return sub;
 }
+
+// Paid expert sessions saved on the account: { reference, expertId, expertName, typeLabel, startsAt, amount, paidAt }.
+const normalizeBookings = (list) =>
+  Array.isArray(list) ? list.filter((b) => b && typeof b.startsAt === "number" && typeof b.reference === "string") : [];
 
 const PROMPT_SUGGESTIONS = [
   "How can I improve my savings rate?",
@@ -1179,21 +1185,55 @@ function DashboardPage({ profile, metrics, fireData, T }) {
 /*  Experts page                                                           */
 /* ---------------------------------------------------------------------- */
 
-// Booking itself just needs a paid plan; which consultation types are available is decided
-// inside the scheduling modal (Standard vs Pro), per expert and per type.
-function canBookExpert(tier) {
-  if (!tier || tier === "ai") return { allowed: false, reason: "Upgrade to Expert Standard or Pro to book sessions." };
-  return { allowed: true, reason: "" };
-}
+// Anyone can book an expert, on any plan (including the free one); every session is paid
+// per booking. Price = expert's rate x consultation-type factor (see sessionPrice in src/Schedule.jsx).
+const EXPERT_TOPICS = ["Budgeting", "Debt Payoff", "Tax Planning", "Retirement", "Stocks", "Crypto", "Real Estate"];
+const EXPERT_SORTS = [
+  { id: "recommended", label: "Recommended" },
+  { id: "price", label: "Lowest price" },
+  { id: "rating", label: "Highest rated" },
+];
 
-function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
-  const { t, lang } = useLang();
+function ExpertsPage({ bookings, setBookings, showToast, T }) {
+  const { t, lang, money } = useLang();
   const [scheduling, setScheduling] = useState(null);
+  const [checkout, setCheckout] = useState(null);
+  const [topic, setTopic] = useState("all");
+  const [sortBy, setSortBy] = useState("recommended");
 
-  const handleBooked = (info) => {
-    const when = info.day.toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { day: "numeric", month: "long" });
-    showToast("Session request sent to {name} for {when} at {time}. They'll reach out within 24 hours.", {
-      name: info.expertName, when, time: `${String(info.hour).padStart(2, "0")}:00`,
+  // Filter by topic, then sort; "recommended" keeps the roster's own order.
+  const shownExperts = useMemo(() => {
+    const list = EXPERTS.filter((ex) => topic === "all" || ex.specialties.includes(topic));
+    if (sortBy === "price") return [...list].sort((a, b) => a.rate - b.rate || b.rating - a.rating);
+    if (sortBy === "rating") return [...list].sort((a, b) => b.rating - a.rating || a.rate - b.rate);
+    return list;
+  }, [topic, sortBy]);
+
+  // Start times of the viewer's upcoming sessions, so the scheduler can block them.
+  const busySlots = useMemo(() => new Set(bookings.filter((b) => b.startsAt > Date.now()).map((b) => b.startsAt)), [bookings]);
+
+  const startCheckout = (expert, { type, day, hour, notes }) => {
+    const startsAt = new Date(day);
+    startsAt.setHours(hour, 0, 0, 0);
+    // The modal may have sat open past the slot's start time.
+    if (startsAt.getTime() <= Date.now()) { showToast("That time has already passed. Please pick another slot."); return; }
+    const price = sessionPrice(expert, type);
+    setScheduling(null);
+    setCheckout({
+      kind: "session", expertId: expert.id, expertName: expert.name, typeLabel: type.label, duration: SESSION_MINUTES,
+      startsAt: startsAt.getTime(), notes, fullPrice: price, amount: price,
+    });
+  };
+
+  const handlePaid = (order, receipt) => {
+    setBookings((list) => [...list, {
+      reference: receipt.ref, expertId: order.expertId, expertName: order.expertName, typeLabel: order.typeLabel,
+      startsAt: order.startsAt, amount: receipt.amount, paidAt: receipt.at,
+    }]);
+    const d = new Date(order.startsAt);
+    const when = d.toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { day: "numeric", month: "long" });
+    showToast("Session booked with {name} for {when} at {time}. They'll confirm within 24 hours.", {
+      name: order.expertName, when, time: `${String(d.getHours()).padStart(2, "0")}:00`,
     });
   };
 
@@ -1204,9 +1244,41 @@ function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
         <p className={cn("text-sm", T.subtext)}>{t("Certified planners and advisors, matched to what you need help with.")}</p>
       </div>
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t("Filter by topic")}>
+          {["all", ...EXPERT_TOPICS].map((x) => (
+            <button
+              key={x}
+              type="button"
+              aria-pressed={topic === x}
+              onClick={() => setTopic(x)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                topic === x ? "border-red-600 bg-red-600 text-white" : cn(T.border, T.subtext, "hover:border-red-600")
+              )}
+            >
+              {x === "all" ? t("All") : t(x)}
+            </button>
+          ))}
+        </div>
+        <label className={cn("flex shrink-0 items-center gap-2 text-xs", T.subtext)}>
+          {t("Sort by")}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className={cn("rounded-lg border px-2.5 py-1.5 text-xs outline-none focus:border-red-600", T.inputBg, T.inputBorder, T.text)}
+          >
+            {EXPERT_SORTS.map((o) => <option key={o.id} value={o.id}>{t(o.label)}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {shownExperts.length === 0 && (
+        <p className={cn("rounded-2xl border p-6 text-center text-sm", T.panel, T.cardBorder, T.subtext)}>{t("No experts cover this topic yet.")}</p>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {EXPERTS.map((ex) => {
-          const gate = canBookExpert(subscriptionTier);
+        {shownExperts.map((ex) => {
           return (
             <div key={ex.id} className={cn("flex flex-col rounded-2xl border p-5", T.panel, T.cardBorder)}>
               <div className="flex items-center gap-3">
@@ -1219,23 +1291,20 @@ function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
               </div>
               <p className={cn("mt-3 flex-1 text-sm", T.subtext)}>{t(ex.bio)}</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {ex.specialties.map((s) => {
-                  const locked = subscriptionTier !== "pro" && specialtyIsProOnly(s);
-                  return (
-                    <span key={s} className={cn("inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-data text-xs", T.border, T.mutedText)}>
-                      {locked && <Lock size={10} />} {t(s)}
-                    </span>
-                  );
-                })}
+                {ex.specialties.map((s) => (
+                  <span key={s} className={cn("inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-data text-xs", T.border, T.mutedText)}>
+                    {t(s)}
+                  </span>
+                ))}
+              </div>
+              <div className={cn("mt-4 text-xs", T.subtext)}>
+                {t("From")} <span className={cn("font-data text-sm font-semibold", T.text)}>{money(ex.rate)}</span> / {t("session")}
               </div>
               <button
-                onClick={() => gate.allowed ? setScheduling(ex) : (showToast(gate.reason), setPage("subscription"))}
-                className={cn(
-                  "mt-4 rounded-lg py-2 text-sm font-semibold transition-colors",
-                  gate.allowed ? "bg-red-600 text-white hover:bg-red-500" : cn("border", T.border, T.subtext, T.hoverBg)
-                )}
+                onClick={() => setScheduling(ex)}
+                className="mt-2 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500"
               >
-                {gate.allowed ? t("Book session") : t("Subscribe to access")}
+                {t("Book session")}
               </button>
             </div>
           );
@@ -1245,10 +1314,21 @@ function ExpertsPage({ subscriptionTier, showToast, setPage, T }) {
       {scheduling && (
         <ScheduleModal
           expert={scheduling}
-          tier={subscriptionTier}
+          busySlots={busySlots}
           T={T}
           onClose={() => setScheduling(null)}
-          onBooked={handleBooked}
+          onCheckout={(booking) => startCheckout(scheduling, booking)}
+        />
+      )}
+
+      {checkout && (
+        <CheckoutModal
+          order={checkout}
+          T={T}
+          formatMoney={money}
+          logoSrc={LOGO_SRC}
+          onPaid={(receipt) => handlePaid(checkout, receipt)}
+          onClose={() => setCheckout(null)}
         />
       )}
     </div>
@@ -1804,6 +1884,7 @@ function loadInitialState() {
     profile: { ...emptyProfile(), ...(account.profile || {}) },
     hasProfile,
     subscription: normalizeSubscription(account.subscription),
+    bookings: normalizeBookings(account.bookings),
     theme: ["dark", "light", "system"].includes(prefs.theme) ? prefs.theme : "dark",
     lang: LANGUAGES.some((l) => l.id === prefs.lang) ? prefs.lang : "en",
   };
@@ -1820,6 +1901,7 @@ export default function App() {
   const [theme, setTheme] = useState(init.theme);
   const [lang, setLang] = useState(init.lang);
   const [subscription, setSubscription] = useState(init.subscription);
+  const [bookings, setBookings] = useState(init.bookings);
   const [toast, setToast] = useState(null);
 
   const langValue = useMemo(() => ({ lang, t: makeT(lang), fmt: makeFmt(lang), money: makeMoney(lang) }), [lang]);
@@ -1832,14 +1914,15 @@ export default function App() {
   }, [theme, lang]);
 
   useEffect(() => {
-    if (session) saveAccount(session.email, { user, profile, hasProfile, subscription });
-  }, [session, user, profile, hasProfile, subscription]);
+    if (session) saveAccount(session.email, { user, profile, hasProfile, subscription, bookings });
+  }, [session, user, profile, hasProfile, subscription, bookings]);
 
   const resetAccountState = () => {
     setUser({ fullName: "", email: "" });
     setProfile(emptyProfile());
     setHasProfile(false);
     setSubscription(FREE_SUBSCRIPTION);
+    setBookings([]);
   };
 
   // When a paid plan reaches its due date the account drops back to the free plan.
@@ -1898,6 +1981,7 @@ export default function App() {
     setProfile({ ...emptyProfile(), fullName, ...(account.profile || {}) });
     setHasProfile(!!account.hasProfile);
     setSubscription(normalizeSubscription(account.subscription));
+    setBookings(normalizeBookings(account.bookings));
     setSession(startSession(result.email, remember));
     if (account.hasProfile) {
       setPage("dashboard");
@@ -1970,7 +2054,7 @@ export default function App() {
       {AUTHED_PAGES.includes(page) && (
         <AppShell page={page} setPage={setPage} onLogout={handleLogout} T={T} healthStatus={metrics.healthStatus} userName={profile.fullName || user.fullName} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
           {page === "dashboard" && <DashboardPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
-          {page === "experts" && <ExpertsPage subscriptionTier={subscription.tier} showToast={showToast} setPage={setPage} T={T} />}
+          {page === "experts" && <ExpertsPage bookings={bookings} setBookings={setBookings} showToast={showToast} T={T} />}
           {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} T={T} />}
           {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} T={T} />}
           {page === "chat" && <ChatPage metrics={metrics} fireData={fireData} T={T} />}
