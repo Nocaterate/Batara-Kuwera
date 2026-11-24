@@ -7,7 +7,7 @@ export const DARK_TOKENS = {
   panel: "bg-zinc-900",
   panelAlt: "bg-zinc-900/60",
   border: "border-zinc-800",
-  cardBorder: "border-red-900/40",
+  cardBorder: "border-red-900/20", // card outlines: a faint red hint (was /40)
   text: "text-zinc-100",
   subtext: "text-zinc-400",
   mutedText: "text-zinc-500",
@@ -36,7 +36,7 @@ export const LIGHT_TOKENS = {
   panel: "bg-white",
   panelAlt: "bg-zinc-100/60",
   border: "border-zinc-300",
-  cardBorder: "border-red-200",
+  cardBorder: "border-red-100", // card outlines: a faint red hint (was red-200)
   text: "text-zinc-900",
   subtext: "text-zinc-600",
   mutedText: "text-zinc-500",
