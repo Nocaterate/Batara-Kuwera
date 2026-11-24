@@ -24,20 +24,10 @@ import { addPeriod } from "./src/payments.js";
 import CheckoutModal from "./src/Checkout.jsx";
 import CancelPlanModal from "./src/CancelPlan.jsx";
 import ScheduleModal, { SESSION_MINUTES, sessionPrice } from "./src/Schedule.jsx";
-import { generateFinancialReportPdf } from "./src/pdfReport.js";
 
 /* ---------------------------------------------------------------------- */
-/*  Fonts / tokens                                                         */
+/*  Tokens (fonts and the .font-display / .font-data classes live in index.html and src/index.css) */
 /* ---------------------------------------------------------------------- */
-
-const FontStyles = () => (
-  <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-    .font-display { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
-    .font-data { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace; }
-  `}</style>
-);
-
 
 const LOGO_SRC = "/logo.png";
 
@@ -1557,6 +1547,8 @@ function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setPro
 
   const exportReport = async () => {
     try {
+      // jsPDF is large and only needed here, so it loads on first click instead of with the app.
+      const { generateFinancialReportPdf } = await import("./src/pdfReport.js");
       await generateFinancialReportPdf({ user, profile, metrics, fireData, lang, t, fmt, formatCurrency: money, logoSrc: LOGO_SRC });
       showToast("Your financial report has started downloading.");
     } catch {
@@ -2045,7 +2037,6 @@ export default function App() {
   return (
     <LangContext.Provider value={langValue}>
     <div className="min-h-screen w-full font-sans">
-      <FontStyles />
 
       {page === "login" && <LoginPage onLogin={handleLogin} onGoRegister={() => setPage("register")} showToast={showToast} />}
       {page === "register" && <RegisterPage onRegister={handleRegister} onGoLogin={() => setPage("login")} />}

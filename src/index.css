@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Fonts are loaded from index.html (so the download starts before the app's JS runs). */
+.font-display { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
+.font-data { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace; }
