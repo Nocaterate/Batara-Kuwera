@@ -2,10 +2,10 @@ import React, { useState } from "react";
 import { Check, ChevronRight, Lock, Pencil, Plus, Target, Trash2, Undo2 } from "lucide-react";
 import { useLang } from "./i18n.js";
 import { cn } from "./ui.js";
+import { AmountField } from "./components/fields.jsx";
 
 /* Savings goals. A goal is { id, name, target, targetDate (timestamp or null), deposits: [{ amount, at }], createdAt },
- * saved on the account. Progress comes from manual deposits ("Add savings").
- * AmountField is passed in from the main file (it lives there until the file is split). */
+ * saved on the account. Progress comes from manual deposits ("Add savings"). */
 
 const MONTH_MS = 30.44 * 24 * 60 * 60 * 1000;
 export const goalSaved = (g) => g.deposits.reduce((sum, d) => sum + d.amount, 0);
@@ -36,7 +36,7 @@ function ProgressBar({ value, done }) {
 
 const SUGGESTIONS = ["Emergency fund", "House down payment", "Wedding", "Vacation", "New laptop"];
 
-function GoalForm({ initial, onSave, onCancel, AmountField, T }) {
+function GoalForm({ initial, onSave, onCancel, T }) {
   const { t } = useLang();
   const [name, setName] = useState(initial?.name ?? "");
   const [target, setTarget] = useState(initial?.target ?? "");
@@ -87,7 +87,7 @@ function GoalForm({ initial, onSave, onCancel, AmountField, T }) {
   );
 }
 
-function GoalCard({ goal, monthlySurplus, onDeposit, onUndo, onEdit, onDelete, AmountField, T }) {
+function GoalCard({ goal, monthlySurplus, onDeposit, onUndo, onEdit, onDelete, T }) {
   const { t, lang, money } = useLang();
   const [amount, setAmount] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -161,7 +161,7 @@ function GoalCard({ goal, monthlySurplus, onDeposit, onUndo, onEdit, onDelete, A
 }
 
 // maxGoals: null = unlimited (paid plans), 1 on Free.
-export default function GoalsPage({ goals, setGoals, maxGoals, monthlySurplus, setPage, showToast, AmountField, T }) {
+export default function GoalsPage({ goals, setGoals, maxGoals, monthlySurplus, setPage, showToast, T }) {
   const { t } = useLang();
   const [editing, setEditing] = useState(null); // null, "new" or a goal id
   const atLimit = maxGoals !== null && goals.length >= maxGoals;
@@ -202,7 +202,7 @@ export default function GoalsPage({ goals, setGoals, maxGoals, monthlySurplus, s
         </div>
       )}
 
-      {editing === "new" && <GoalForm onSave={create} onCancel={() => setEditing(null)} AmountField={AmountField} T={T} />}
+      {editing === "new" && <GoalForm onSave={create} onCancel={() => setEditing(null)} T={T} />}
 
       {goals.length === 0 && editing !== "new" ? (
         <div className={cn("rounded-2xl border p-8 text-center", T.panel, T.cardBorder)}>
@@ -214,13 +214,13 @@ export default function GoalsPage({ goals, setGoals, maxGoals, monthlySurplus, s
           {goals.map((g) => (editing === g.id ? (
             <li key={g.id}>
               <GoalForm
-                initial={g} AmountField={AmountField} T={T} onCancel={() => setEditing(null)}
+                initial={g} T={T} onCancel={() => setEditing(null)}
                 onSave={(data) => { update(g.id, (x) => ({ ...x, ...data })); setEditing(null); }}
               />
             </li>
           ) : (
             <GoalCard
-              key={g.id} goal={g} monthlySurplus={monthlySurplus} AmountField={AmountField} T={T}
+              key={g.id} goal={g} monthlySurplus={monthlySurplus} T={T}
               onDeposit={(amount) => deposit(g, amount)}
               onUndo={() => update(g.id, (x) => ({ ...x, deposits: x.deposits.slice(0, -1) }))}
               onEdit={() => setEditing(g.id)}

@@ -1,0 +1,61 @@
+// Theme tokens (Tailwind class sets for dark and light) and the logo path.
+
+export const LOGO_SRC = "/logo.png";
+
+export const DARK_TOKENS = {
+  bg: "bg-zinc-950",
+  panel: "bg-zinc-900",
+  panelAlt: "bg-zinc-900/60",
+  border: "border-zinc-800",
+  cardBorder: "border-red-900/40",
+  text: "text-zinc-100",
+  subtext: "text-zinc-400",
+  mutedText: "text-zinc-500",
+  inputBg: "bg-zinc-950",
+  inputBorder: "border-zinc-800",
+  hoverBg: "hover:bg-zinc-800/60",
+  sidebarBg: "bg-zinc-950",
+  accent: "text-red-400",
+  good: "text-emerald-400",
+  warn: "text-amber-400",
+  bad: "text-red-400",
+  dangerBorder: "border-red-900/50",
+  dangerHover: "hover:bg-red-950/30",
+  notice: "border-amber-800/40 bg-amber-950/20 text-amber-300",
+  badge: {
+    CRITICAL: "bg-red-950/50 border-red-700/50 text-red-400",
+    MEDIUM: "bg-amber-950/40 border-amber-700/40 text-amber-400",
+    OPTIMAL: "bg-emerald-950/40 border-emerald-700/40 text-emerald-400",
+  },
+  chartGrid: "#3f3f46",
+  popover: "bg-zinc-800 border-zinc-700",
+};
+
+export const LIGHT_TOKENS = {
+  bg: "bg-zinc-50",
+  panel: "bg-white",
+  panelAlt: "bg-zinc-100/60",
+  border: "border-zinc-300",
+  cardBorder: "border-red-200",
+  text: "text-zinc-900",
+  subtext: "text-zinc-600",
+  mutedText: "text-zinc-500",
+  inputBg: "bg-white",
+  inputBorder: "border-zinc-400",
+  hoverBg: "hover:bg-zinc-100",
+  sidebarBg: "bg-white",
+  accent: "text-red-700",
+  good: "text-emerald-700",
+  warn: "text-amber-700",
+  bad: "text-red-600",
+  dangerBorder: "border-red-300",
+  dangerHover: "hover:bg-red-50",
+  notice: "border-amber-300 bg-amber-50 text-amber-900",
+  badge: {
+    CRITICAL: "bg-red-50 border-red-300 text-red-700",
+    MEDIUM: "bg-amber-50 border-amber-400 text-amber-800",
+    OPTIMAL: "bg-emerald-50 border-emerald-400 text-emerald-800",
+  },
+  chartGrid: "#d4d4d8",
+  popover: "bg-white border-zinc-300",
+};
