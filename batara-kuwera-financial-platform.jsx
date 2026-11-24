@@ -26,6 +26,7 @@ import CancelPlanModal from "./src/CancelPlan.jsx";
 import ScheduleModal, { SESSION_MINUTES, sessionPrice } from "./src/Schedule.jsx";
 import MySessions, { isRefundable } from "./src/MySessions.jsx";
 import { coachReply } from "./src/coach.js";
+import DowngradePlanModal from "./src/DowngradePlan.jsx";
 import WhatIfSimulator from "./src/WhatIf.jsx";
 
 /* ---------------------------------------------------------------------- */
@@ -165,20 +166,21 @@ const TIERS = [
   },
   {
     id: "standard", name: "Expert Standard", monthly: 149000, tagline: "Bring in a human.",
-    features: ["Everything in Free", "1 free Normal Consultation every month", "10% off extra expert sessions", "Full what-if simulator", "PDF financial report"],
+    features: ["Everything in Free", "1 free Normal Consultation every month", "15% off extra expert sessions", "Full what-if simulator", "PDF financial report"],
   },
   {
-    id: "pro", name: "Expert Pro", monthly: 399000, tagline: "Full wealth coverage.",
-    features: ["Everything in Expert Standard", "2 free sessions every month, any type", "20% off extra expert sessions", "Priority booking: same-day slots, up to 30 days ahead"],
+    id: "pro", name: "Expert Pro", monthly: 399000, tagline: "For specialist advice.",
+    features: ["Everything in Expert Standard", "2 free sessions every month, any type", "20% off extra expert sessions", "Priority booking: same-day slots, up to 30 days ahead", "Full refund when you cancel up to 2 hours before"],
   },
 ];
 
 // What each plan actually unlocks. Keep in step with the TIERS feature lists above.
 // freeTypes: consultation types a free monthly session can be used for (null = any type).
+// refundHours: cancel a session at least this long before it starts for a full refund.
 const PLAN_PERKS = {
-  ai: { freeSessions: 0, freeTypes: [], discount: 0, daysAhead: 10, sameDay: false, pdfReport: false, fullSimulator: false },
-  standard: { freeSessions: 1, freeTypes: ["normal"], discount: 0.1, daysAhead: 10, sameDay: false, pdfReport: true, fullSimulator: true },
-  pro: { freeSessions: 2, freeTypes: null, discount: 0.2, daysAhead: 30, sameDay: true, pdfReport: true, fullSimulator: true },
+  ai: { freeSessions: 0, freeTypes: [], discount: 0, daysAhead: 10, sameDay: false, pdfReport: false, fullSimulator: false, refundHours: 24 },
+  standard: { freeSessions: 1, freeTypes: ["normal"], discount: 0.15, daysAhead: 10, sameDay: false, pdfReport: true, fullSimulator: true, refundHours: 24 },
+  pro: { freeSessions: 2, freeTypes: null, discount: 0.2, daysAhead: 30, sameDay: true, pdfReport: true, fullSimulator: true, refundHours: 2 },
 };
 const perksFor = (tier) => PLAN_PERKS[tier] ?? PLAN_PERKS.ai;
 
@@ -1267,13 +1269,13 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
   const cancelBooking = (reference) => {
     const booking = bookings.find((b) => b.reference === reference);
     if (!booking || booking.status === "cancelled" || booking.startsAt <= Date.now()) return;
-    const refunded = isRefundable(booking);
+    const refunded = isRefundable(booking, perks.refundHours);
     setBookings((list) => list.map((b) => (b.reference === reference ? { ...b, status: "cancelled", cancelledAt: Date.now(), refunded } : b)));
     showToast(
-      !refunded ? "Session cancelled. It was within 24 hours, so it isn't refunded."
+      !refunded ? "Session cancelled. It was within {h} hours of the start, so it isn't refunded."
         : booking.usedCredit ? "Session cancelled. Your free monthly session has been returned."
           : "Session cancelled. {amount} will be refunded to your original payment method.",
-      { amount: money(booking.amount) }
+      { amount: money(booking.amount), h: perks.refundHours }
     );
   };
 
@@ -1346,7 +1348,7 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
         ))}
       </div>
 
-      {tab === "mine" && <MySessions bookings={bookings} photoFor={photoFor} onCancel={cancelBooking} onBrowse={() => setTab("find")} T={T} />}
+      {tab === "mine" && <MySessions bookings={bookings} refundHours={perks.refundHours} photoFor={photoFor} onCancel={cancelBooking} onBrowse={() => setTab("find")} T={T} />}
 
       {tab === "find" && (<>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1451,11 +1453,12 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
 /*  Subscription page                                                      */
 /* ---------------------------------------------------------------------- */
 
-function SubscriptionPage({ subscription, setSubscription, setPage, T }) {
+function SubscriptionPage({ subscription, setSubscription, setPage, showToast, T }) {
   const { t, lang, money } = useLang();
   const [cycleChoice, setCycleChoice] = useState("monthly");
   const [checkout, setCheckout] = useState(null);
   const [cancelling, setCancelling] = useState(null);
+  const [downgrading, setDowngrading] = useState(null);
 
   const paid = subscription.tier !== "ai";
   // The billing cycle is locked while a paid plan is active, so an upgrade is always priced in the same cycle.
@@ -1494,6 +1497,24 @@ function SubscriptionPage({ subscription, setSubscription, setPage, T }) {
     dueDate: subscription.expiresAt,
   });
   const usedShare = paid ? Math.min(1, Math.max(0, (Date.now() - subscription.startedAt) / (subscription.expiresAt - subscription.startedAt))) : 0;
+
+  // Switching down to a lower paid plan happens now: same cycle and due date, and the unused part
+  // of the price difference is refunded (prorated by the time left, rounded to the nearest thousand).
+  const openDowngrade = (tier) => setDowngrading({
+    tierId: tier.id, fromName: currentTier.name, toName: tier.name, dueDate: subscription.expiresAt,
+    refund: Math.max(0, Math.round(((priceOf(currentTier) - priceOf(tier)) * (1 - usedShare)) / 1000) * 1000),
+    lostFeatures: TIERS.filter((x) => TIER_RANK[x.id] > TIER_RANK[tier.id] && TIER_RANK[x.id] <= currentRank)
+      .flatMap((x) => x.features).filter((f) => !f.startsWith("Everything in")),
+  });
+  const confirmDowngrade = () => {
+    const d = downgrading;
+    setSubscription({ ...subscription, tier: d.tierId });
+    setDowngrading(null);
+    showToast(
+      d.refund > 0 ? "Switched to {plan}. {amount} will be refunded to your original payment method." : "Switched to {plan}.",
+      { plan: t(d.toName), amount: money(d.refund) }
+    );
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -1551,6 +1572,8 @@ function SubscriptionPage({ subscription, setSubscription, setPage, T }) {
           const rank = TIER_RANK[tier.id];
           const isCurrent = rank === currentRank;
           const isLower = rank < currentRank;
+          // A lower *paid* plan can be switched to directly; dropping to Free goes through "Cancel plan".
+          const canSwitchDown = isLower && rank >= 1;
           const price = priceOf(tier);
           const fullAnnual = tier.monthly * 12;
           return (
@@ -1588,16 +1611,25 @@ function SubscriptionPage({ subscription, setSubscription, setPage, T }) {
                   </li>
                 ))}
               </ul>
-              <button
-                onClick={() => openCheckout(tier)}
-                disabled={isCurrent || isLower}
-                className={cn(
-                  "mt-5 rounded-lg py-2.5 text-sm font-semibold transition-colors",
-                  isCurrent || isLower ? cn("cursor-not-allowed border", T.border, T.mutedText) : "bg-red-600 text-white hover:bg-red-500"
-                )}
-              >
-                {isCurrent ? t("Selected") : isLower ? t("Included in your plan") : paid ? t("Upgrade plan") : t("Select plan")}
-              </button>
+              {canSwitchDown ? (
+                <button
+                  onClick={() => openDowngrade(tier)}
+                  className={cn("mt-5 rounded-lg border py-2.5 text-sm font-semibold transition-colors", T.border, T.text, T.hoverBg)}
+                >
+                  {t("Switch to this plan")}
+                </button>
+              ) : (
+                <button
+                  onClick={() => openCheckout(tier)}
+                  disabled={isCurrent || isLower}
+                  className={cn(
+                    "mt-5 rounded-lg py-2.5 text-sm font-semibold transition-colors",
+                    isCurrent || isLower ? cn("cursor-not-allowed border", T.border, T.mutedText) : "bg-red-600 text-white hover:bg-red-500"
+                  )}
+                >
+                  {isCurrent ? t("Selected") : isLower ? t("Included in your plan") : paid ? t("Upgrade plan") : t("Select plan")}
+                </button>
+              )}
             </div>
           );
         })}
@@ -1620,6 +1652,10 @@ function SubscriptionPage({ subscription, setSubscription, setPage, T }) {
             </button>
           </div>
         </section>
+      )}
+
+      {downgrading && (
+        <DowngradePlanModal info={downgrading} T={T} onClose={() => setDowngrading(null)} onConfirm={confirmDowngrade} />
       )}
 
       {cancelling && (
@@ -2163,7 +2199,7 @@ export default function App() {
         <AppShell page={page} setPage={setPage} onLogout={handleLogout} T={T} healthStatus={metrics.healthStatus} userName={profile.fullName || user.fullName} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
           {page === "dashboard" && <DashboardPage profile={profile} metrics={metrics} fireData={fireData} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
           {page === "experts" && <ExpertsPage subscriptionTier={subscription.tier} bookings={bookings} setBookings={setBookings} showToast={showToast} setPage={setPage} T={T} />}
-          {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} T={T} />}
+          {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} showToast={showToast} T={T} />}
           {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
           {page === "chat" && <ChatPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
         </AppShell>

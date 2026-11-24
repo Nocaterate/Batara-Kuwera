@@ -6,12 +6,12 @@ import Avatar from "./Avatar.jsx";
 import { SESSION_MINUTES } from "./Schedule.jsx";
 import { cn } from "./ui.js";
 
-// Cancelling more than 24 hours before the start refunds the payment (or returns the free
+// Cancelling more than `refundHours` before the start refunds the payment (or returns the free
 // monthly session); later than that the session can still be cancelled, but isn't refunded.
-export const REFUND_WINDOW_MS = 24 * 60 * 60 * 1000;
+// The window depends on the plan: 24 hours, or 2 hours on Expert Pro (see PLAN_PERKS).
 const SESSION_MS = SESSION_MINUTES * 60 * 1000;
 
-export const isRefundable = (booking, now = Date.now()) => booking.startsAt - now > REFUND_WINDOW_MS;
+export const isRefundable = (booking, refundHours, now = Date.now()) => booking.startsAt - now > refundHours * 60 * 60 * 1000;
 const hasStarted = (booking, now) => booking.startsAt <= now;
 const isCancelled = (booking) => booking.status === "cancelled";
 
@@ -75,11 +75,11 @@ function SessionRow({ booking, photo, now, onCancel, T }) {
   );
 }
 
-function CancelSessionModal({ booking, onConfirm, onClose, T }) {
+function CancelSessionModal({ booking, refundHours, onConfirm, onClose, T }) {
   const { t, lang, money } = useLang();
-  const refundable = isRefundable(booking);
+  const refundable = isRefundable(booking, refundHours);
   const outcome = !refundable
-    ? t("This session starts in less than 24 hours, so it won't be refunded.")
+    ? t("This session starts in less than {h} hours, so it won't be refunded.", { h: refundHours })
     : booking.usedCredit
       ? t("Your free monthly session will be returned.")
       : t("You'll be refunded {amount} to your original payment method.", { amount: money(booking.amount) });
@@ -109,7 +109,7 @@ function CancelSessionModal({ booking, onConfirm, onClose, T }) {
 }
 
 // bookings: saved on the account (see normalizeBookings). photoFor(expertId) -> photo path or undefined.
-export default function MySessions({ bookings, photoFor, onCancel, onBrowse, T }) {
+export default function MySessions({ bookings, refundHours, photoFor, onCancel, onBrowse, T }) {
   const { t } = useLang();
   const [cancelling, setCancelling] = useState(null);
   const now = Date.now();
@@ -145,7 +145,7 @@ export default function MySessions({ bookings, photoFor, onCancel, onBrowse, T }
   return (
     <div className="space-y-6">
       <p className={cn("flex items-center gap-1.5 text-xs", T.mutedText)}>
-        <Clock size={12} /> {t("Cancel more than 24 hours ahead for a full refund, or to get your free session back.")}
+        <Clock size={12} /> {t("Cancel more than {h} hours ahead for a full refund, or to get your free session back.", { h: refundHours })}
       </p>
       {section(t("Upcoming"), upcoming, t("No upcoming sessions."))}
       {past.length > 0 && section(t("Past & cancelled"), past, "")}
@@ -153,6 +153,7 @@ export default function MySessions({ bookings, photoFor, onCancel, onBrowse, T }
       {cancelling && (
         <CancelSessionModal
           booking={cancelling}
+          refundHours={refundHours}
           T={T}
           onClose={() => setCancelling(null)}
           onConfirm={() => { onCancel(cancelling.reference); setCancelling(null); }}
