@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Check, ChevronLeft, Clock, CreditCard, Info, Lock, QrCode, X } from "lucide-react";
 import { useLang } from "./i18n.js";
 import Modal from "./Modal.jsx";
 import SoftWrap from "./SoftWrap.jsx";
 import { cn } from "./ui.js";
+import Confetti from "./components/Confetti.jsx";
 import {
   BRAND_LABEL, buildQrisPayload, cardDigits, detectBrand, formatCardNumber, formatExpiry, makeReference, validateCard,
 } from "./payments.js";
@@ -17,10 +18,6 @@ const CSS = `
 @keyframes bk-check { from { stroke-dashoffset: 48 } to { stroke-dashoffset: 0 } }
 @keyframes bk-ring { from { transform: scale(.5); opacity: 0 } to { transform: scale(1); opacity: 1 } }
 @keyframes bk-pulse { 0%, 100% { opacity: .35 } 50% { opacity: 1 } }
-@keyframes bk-confetti {
-  0% { transform: translate3d(0, -12px, 0) rotate(0); opacity: 1 }
-  100% { transform: translate3d(var(--dx), 340px, 0) rotate(var(--rot)); opacity: 0 }
-}
 .bk-scene { perspective: 1100px }
 .bk-card { position: relative; transform-style: preserve-3d; transition: transform .65s cubic-bezier(.2,.8,.2,1) }
 .bk-card.is-flipped { transform: rotateY(180deg) }
@@ -462,35 +459,6 @@ function Processing({ method, T }) {
       <h2 className={cn("font-display text-lg font-bold", T.text)}>{t("Processing payment…")}</h2>
       <p className={cn("mt-1 text-sm", T.subtext)}>{t(messages[phase])}</p>
       <p className={cn("mt-6 text-xs", T.subtext)}>{t("Please don't close this window.")}</p>
-    </div>
-  );
-}
-
-function Confetti() {
-  const pieces = useMemo(
-    () => Array.from({ length: 30 }, (_, i) => ({
-      left: 8 + Math.random() * 84,
-      dx: Math.round((Math.random() - 0.5) * 160),
-      rot: Math.round(300 + Math.random() * 500),
-      delay: Math.random() * 0.35,
-      dur: 1.6 + Math.random() * 1.2,
-      color: ["#dc2626", "#f59e0b", "#10b981", "#fb923c", "#fafafa"][i % 5],
-      w: 6 + Math.round(Math.random() * 5),
-    })),
-    []
-  );
-  return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 h-full overflow-hidden" aria-hidden="true">
-      {pieces.map((p, i) => (
-        <span
-          key={i}
-          className="bk-anim absolute top-0 block rounded-[2px] opacity-0"
-          style={{
-            left: `${p.left}%`, width: p.w, height: p.w * 1.6, background: p.color, "--dx": `${p.dx}px`, "--rot": `${p.rot}deg`,
-            animation: `bk-confetti ${p.dur}s ${p.delay}s cubic-bezier(.2,.7,.4,1) forwards`,
-          }}
-        />
-      ))}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 import { Shield, LayoutDashboard, Users, Settings as SettingsIcon, MessageSquare, LogOut, Menu, Target } from "lucide-react";
 import { useLang } from "./i18n.js";
 import { cn } from "./ui.js";
+import KawungLayer from "./components/KawungLayer.jsx";
 import { HealthBadge } from "./components/common.jsx";
 import { LOGO_SRC } from "./theme.js";
 
@@ -21,15 +22,17 @@ export function AppShell({ page, setPage, onLogout, T, healthStatus, userName, s
       {sidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/50 md:hidden" />}
 
       <aside className={cn(
-        "fixed z-40 flex h-full w-60 flex-col border-r transition-transform md:static md:translate-x-0",
+        // Full window height; on desktop it stays in place (sticky) while the page scrolls.
+        "fixed inset-y-0 left-0 z-40 isolate flex h-screen w-60 shrink-0 flex-col border-r transition-transform md:sticky md:top-0 md:translate-x-0",
         T.sidebarBg, T.border, sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
+        <KawungLayer from="bottom" className="inset-x-0 bottom-0 h-48" opacity={0.18} />
         <div className={cn("flex items-center gap-2 border-b px-5 py-5", T.border)}>
           <img src={LOGO_SRC} alt="Batara Kuwera" className="h-8 w-8 rounded-lg object-cover" />
           <span className={cn("font-display text-lg font-bold", T.text)}>BATARA KUWERA</span>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = page === item.id;

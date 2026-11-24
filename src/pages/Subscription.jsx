@@ -83,6 +83,10 @@ export function SubscriptionPage({ subscription, setSubscription, setPage, showT
       {paid && (
         <div className={cn("relative overflow-hidden rounded-2xl border p-5", T.panel, T.cardBorder)}>
           <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-red-600/15" style={{ filter: "blur(48px)" }} />
+          <div
+            className="bk-kawung pointer-events-none absolute inset-y-0 right-0 w-72 opacity-[0.3]"
+            style={{ maskImage: "linear-gradient(to left, black, transparent)", WebkitMaskImage: "linear-gradient(to left, black, transparent)" }}
+          />
           <div className="relative flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className={cn("text-xs uppercase tracking-wider", T.mutedText)}>{t("Your plan")}</div>

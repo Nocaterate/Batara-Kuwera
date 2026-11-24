@@ -5,3 +5,29 @@
 /* Fonts are loaded from index.html (so the download starts before the app's JS runs). */
 .font-display { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
 .font-data { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace; }
+
+/* Confetti (src/components/Confetti.jsx): --fall is how far a piece drops. */
+@keyframes bk-confetti {
+  0% { transform: translate3d(0, -12px, 0) rotate(0); opacity: 1 }
+  100% { transform: translate3d(var(--dx), var(--fall, 340px), 0) rotate(var(--rot)); opacity: 0 }
+}
+
+/* Kawung: an original take on the classic Javanese batik motif (four ovals meeting at a point),
+   drawn as a 40px tile. Use it on an absolutely positioned layer and set its opacity there. */
+.bk-kawung {
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'><g fill='none' stroke='%23dc2626' stroke-width='1'><ellipse cx='10' cy='10' rx='5' ry='9' transform='rotate(-45 10 10)'/><ellipse cx='30' cy='10' rx='5' ry='9' transform='rotate(45 30 10)'/><ellipse cx='10' cy='30' rx='5' ry='9' transform='rotate(45 10 30)'/><ellipse cx='30' cy='30' rx='5' ry='9' transform='rotate(-45 30 30)'/></g><g fill='%23dc2626'><circle cx='20' cy='20' r='1.6'/><circle cx='0' cy='0' r='1.6'/><circle cx='40' cy='0' r='1.6'/><circle cx='0' cy='40' r='1.6'/><circle cx='40' cy='40' r='1.6'/></g></svg>");
+  background-size: 40px 40px;
+  background-position: center top;
+}
+
+/* Loading placeholders: a soft highlight sweeping across grey blocks. */
+@keyframes bk-shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+.bk-skeleton {
+  background: linear-gradient(90deg, rgba(113,113,122,.14) 25%, rgba(113,113,122,.28) 37%, rgba(113,113,122,.14) 63%);
+  background-size: 400% 100%;
+  animation: bk-shimmer 1.4s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-anim, .bk-skeleton { animation: none !important }
+}

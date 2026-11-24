@@ -4,12 +4,18 @@ import { useLang } from "../i18n.js";
 import { cn } from "../ui.js";
 import SoftWrap from "../SoftWrap.jsx";
 import { InfoTip } from "./fields.jsx";
+import useCountUp from "../useCountUp.js";
 
-export function StatCard({ icon: Icon, label, info, value, sub, tone = "default", T }) {
+// Pass `countTo` (a number) and `format` to have the value count up from zero when the card appears.
+export function StatCard({ icon: Icon, label, info, value, countTo, format, sub, tone = "default", T }) {
   const { t } = useLang();
+  const animated = useCountUp(countTo ?? 0);
+  const finalText = countTo !== undefined ? format(countTo) : value;
+  const shown = countTo !== undefined ? format(animated) : value;
   const toneColor = { default: T.text, good: T.good, warn: T.warn, bad: T.bad }[tone];
   // Long amounts step down a size so they fit in fewer lines; they still only break at separators.
-  const sizeClass = String(value).length >= 17 ? "text-lg" : String(value).length >= 13 ? "text-xl" : "text-2xl";
+  // Sized by the final value, so the text doesn't change size while it counts up.
+  const sizeClass = String(finalText).length >= 17 ? "text-lg" : String(finalText).length >= 13 ? "text-xl" : "text-2xl";
   return (
     <div className={cn("min-w-0 rounded-xl border p-4", T.panel, T.cardBorder)}>
       <div className="flex items-center justify-between">
@@ -19,7 +25,7 @@ export function StatCard({ icon: Icon, label, info, value, sub, tone = "default"
         </span>
         <Icon size={15} className={T.mutedText} />
       </div>
-      <div className={cn("mt-2 font-data font-semibold [overflow-wrap:anywhere]", sizeClass, toneColor)}><SoftWrap>{value}</SoftWrap></div>
+      <div className={cn("mt-2 font-data font-semibold [overflow-wrap:anywhere]", sizeClass, toneColor)}><SoftWrap>{shown}</SoftWrap></div>
       {sub && <div className={cn("mt-1 text-xs", T.mutedText)}>{t(sub)}</div>}
     </div>
   );

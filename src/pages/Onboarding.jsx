@@ -44,8 +44,9 @@ export function OnboardingPage({ profile, setProfile, onComplete, setLang }) {
   const back = () => { if (step > 0) setStep(step - 1); };
 
   return (
-    <div className="min-h-screen bg-zinc-950 px-4 py-10">
-      <div className="mx-auto max-w-xl">
+    <div className="relative min-h-screen overflow-hidden bg-zinc-950 px-4 py-10">
+      <div className="bk-kawung pointer-events-none absolute inset-0 opacity-[0.16]" style={{ maskImage: "radial-gradient(ellipse at top, black 20%, transparent 75%)", WebkitMaskImage: "radial-gradient(ellipse at top, black 20%, transparent 75%)" }} />
+      <div className="relative mx-auto max-w-xl">
         <div className="mb-8 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <img src={LOGO_SRC} alt="Batara Kuwera" className="h-9 w-9 rounded-lg object-cover" />

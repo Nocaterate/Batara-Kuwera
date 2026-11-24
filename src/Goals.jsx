@@ -3,6 +3,7 @@ import { Check, ChevronRight, Lock, Pencil, Plus, Target, Trash2, Undo2 } from "
 import { useLang } from "./i18n.js";
 import { cn } from "./ui.js";
 import { AmountField } from "./components/fields.jsx";
+import Confetti from "./components/Confetti.jsx";
 
 /* Savings goals. A goal is { id, name, target, targetDate (timestamp or null), deposits: [{ amount, at }], createdAt },
  * saved on the account. Progress comes from manual deposits ("Add savings"). */
@@ -164,6 +165,7 @@ function GoalCard({ goal, monthlySurplus, onDeposit, onUndo, onEdit, onDelete, T
 export default function GoalsPage({ goals, setGoals, maxGoals, monthlySurplus, setPage, showToast, T }) {
   const { t } = useLang();
   const [editing, setEditing] = useState(null); // null, "new" or a goal id
+  const [celebration, setCelebration] = useState(null); // a key; set when a goal is reached
   const atLimit = maxGoals !== null && goals.length >= maxGoals;
 
   const update = (id, fn) => setGoals((list) => list.map((g) => (g.id === id ? fn(g) : g)));
@@ -175,11 +177,17 @@ export default function GoalsPage({ goals, setGoals, maxGoals, monthlySurplus, s
   const deposit = (goal, amount) => {
     const reached = goalSaved(goal) < goal.target && goalSaved(goal) + amount >= goal.target;
     update(goal.id, (g) => ({ ...g, deposits: [...g.deposits, { amount, at: Date.now() }] }));
-    if (reached) showToast("You reached your goal: {name}!", { name: goal.name });
+    if (reached) {
+      showToast("You reached your goal: {name}!", { name: goal.name });
+      const key = Date.now();
+      setCelebration(key);
+      window.setTimeout(() => setCelebration((c) => (c === key ? null : c)), 4000);
+    }
   };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      {celebration && <Confetti key={celebration} fullScreen count={70} />}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("Savings goals")}</h1>

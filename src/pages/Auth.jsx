@@ -19,11 +19,8 @@ function AuthShell({ children }) {
         className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded-full bg-red-700/20"
         style={{ height: 420, width: 720, filter: "blur(110px)" }}
       />
-      <div className="pointer-events-none absolute inset-0" style={{
-        backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
-        backgroundSize: "26px 26px",
-        opacity: 0.05,
-      }} />
+      {/* Kawung batik pattern, fading out towards the bottom (see .bk-kawung in index.css). */}
+      <div className="bk-kawung pointer-events-none absolute inset-0 opacity-[0.22]" style={{ maskImage: "radial-gradient(ellipse at top, black 20%, transparent 75%)", WebkitMaskImage: "radial-gradient(ellipse at top, black 20%, transparent 75%)" }} />
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 flex items-center justify-center gap-2">
           <img src={LOGO_SRC} alt="Batara Kuwera" className="h-9 w-9 rounded-lg object-cover" />

@@ -20,10 +20,22 @@ const SubscriptionPage = named(() => import("./pages/Subscription.jsx"), "Subscr
 const SettingsPage = named(() => import("./pages/Settings.jsx"), "SettingsPage");
 const ChatPage = named(() => import("./pages/Chat.jsx"), "ChatPage");
 
+// Placeholder while a page's code loads: a title, a row of cards and two panels, with a shimmer.
 function PageLoading() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-label="Loading">
-      <span className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-500/20 border-t-red-600" />
+    <div className="mx-auto max-w-6xl space-y-6" role="status" aria-label="Loading">
+      <div className="space-y-2">
+        <div className="bk-skeleton h-7 w-56 rounded-lg" />
+        <div className="bk-skeleton h-4 w-72 max-w-full rounded-md" />
+      </div>
+      <div className="bk-skeleton h-24 rounded-2xl" />
+      <div className="grid grid-cols-1 gap-4 min-[400px]:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="bk-skeleton h-24 rounded-xl" />)}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-5">
+        <div className="bk-skeleton h-72 rounded-2xl lg:col-span-2" />
+        <div className="bk-skeleton h-72 rounded-2xl lg:col-span-3" />
+      </div>
     </div>
   );
 }

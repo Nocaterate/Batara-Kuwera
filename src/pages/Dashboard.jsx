@@ -1,5 +1,5 @@
 // Dashboard: health status, key metrics, charts, cards and the what-if simulator.
-import { TrendingUp, Wallet, PiggyBank, CreditCard } from "lucide-react";
+import { TrendingUp, Wallet, PiggyBank, CreditCard, Sunrise, Sun, Sunset, Moon } from "lucide-react";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { useLang } from "../i18n.js";
 import { compactShort } from "../numberFormat.js";
@@ -11,6 +11,7 @@ import WhatIfSimulator from "../WhatIf.jsx";
 import { AllocationChart } from "../components/AllocationChart.jsx";
 import { StatCard, HealthBadge } from "../components/common.jsx";
 import { InfoTip } from "../components/fields.jsx";
+import KawungLayer from "../components/KawungLayer.jsx";
 import { GLOSSARY, FIELD_INFO, glossaryDef, expertPhoto } from "../data.js";
 import { simulateProfile } from "../finance.js";
 import { perksFor } from "../plans.js";
@@ -21,8 +22,21 @@ const DIAGNOSIS = {
   OPTIMAL: "Your fundamentals are strong across savings, buffer, and debt load. Focus now shifts to optimizing growth toward your FIRE target.",
 };
 
+// Greeting by local time of day. Indonesian distinguishes siang (midday) from sore (late afternoon).
+function greetingFor(hour) {
+  if (hour >= 4 && hour < 11) return { text: "Good morning", icon: Sunrise };
+  if (hour >= 11 && hour < 15) return { text: "Good day", icon: Sun };
+  if (hour >= 15 && hour < 18) return { text: "Good afternoon", icon: Sunset };
+  return { text: "Good evening", icon: Moon };
+}
+
 export function DashboardPage({ profile, metrics, fireData, subscriptionTier, bookings, goals, openMySessions, setPage, T }) {
   const { t, fmt, lang, money } = useLang();
+  const greet = greetingFor(new Date().getHours());
+  const GreetIcon = greet.icon;
+  // First word of the name; skipped if it's an email address (someone typed their email as the name).
+  const firstWord = (profile.fullName || "").trim().split(/\s+/)[0];
+  const firstName = firstWord.includes("@") ? "" : firstWord;
   const pieData = [
     { name: t("Essentials"), value: profile.essentialExpenses, color: "#dc2626" },
     { name: t("Discretionary"), value: profile.discretionaryExpenses, color: "#fb923c" },
@@ -33,11 +47,15 @@ export function DashboardPage({ profile, metrics, fireData, subscriptionTier, bo
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("Dashboard")}</h1>
+        <h1 className={cn("flex items-center gap-2 font-display text-2xl font-bold", T.text)}>
+          <GreetIcon size={22} className={T.accent} aria-hidden="true" />
+          {firstName ? t("{greeting}, {name}", { greeting: t(greet.text), name: firstName }) : t(greet.text)}
+        </h1>
         <p className={cn("text-sm", T.subtext)}>{t("Here's where things stand this month.")}</p>
       </div>
 
-      <div className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
+      <div className={cn("relative isolate overflow-hidden rounded-2xl border p-5", T.panel, T.cardBorder)}>
+        <KawungLayer from="right" className="inset-y-0 right-0 w-80" opacity={0.28} />
         <div className="flex flex-wrap items-center gap-3">
           <HealthBadge status={metrics.healthStatus} size="lg" T={T} />
           <span className="flex items-center gap-1.5">
@@ -54,10 +72,10 @@ export function DashboardPage({ profile, metrics, fireData, subscriptionTier, bo
       </div>
 
       <div className="grid grid-cols-1 gap-4 min-[400px]:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Wallet} label="Net worth" info={glossaryDef("Net worth")} value={money(metrics.netWorth)} T={T} tone={metrics.netWorth >= 0 ? "good" : "bad"} />
-        <StatCard icon={TrendingUp} label="Savings rate" info={glossaryDef("Savings rate")} value={`${fmt(metrics.savingsRate)}%`} T={T} tone={metrics.savingsRate > 30 ? "good" : metrics.savingsRate < 10 ? "bad" : "warn"} />
-        <StatCard icon={CreditCard} label="Debt-to-income" info={glossaryDef("DTI ratio")} value={`${fmt(metrics.dti)}%`} T={T} tone={metrics.dti < 20 ? "good" : metrics.dti > 40 ? "bad" : "warn"} />
-        <StatCard icon={PiggyBank} label="Emergency fund" info={glossaryDef("Emergency fund")} value={`${fmt(metrics.emergencyFundRatio)}\u00A0${t("mo")}`} T={T} tone={metrics.emergencyFundRatio > 6 ? "good" : metrics.emergencyFundRatio < 3 ? "bad" : "warn"} sub="Months of expenses covered" />
+        <StatCard icon={Wallet} label="Net worth" info={glossaryDef("Net worth")} countTo={metrics.netWorth} format={money} T={T} tone={metrics.netWorth >= 0 ? "good" : "bad"} />
+        <StatCard icon={TrendingUp} label="Savings rate" info={glossaryDef("Savings rate")} countTo={metrics.savingsRate} format={(n) => `${fmt(n)}%`} T={T} tone={metrics.savingsRate > 30 ? "good" : metrics.savingsRate < 10 ? "bad" : "warn"} />
+        <StatCard icon={CreditCard} label="Debt-to-income" info={glossaryDef("DTI ratio")} countTo={metrics.dti} format={(n) => `${fmt(n)}%`} T={T} tone={metrics.dti < 20 ? "good" : metrics.dti > 40 ? "bad" : "warn"} />
+        <StatCard icon={PiggyBank} label="Emergency fund" info={glossaryDef("Emergency fund")} countTo={metrics.emergencyFundRatio} format={(n) => `${fmt(n)}\u00A0${t("mo")}`} T={T} tone={metrics.emergencyFundRatio > 6 ? "good" : metrics.emergencyFundRatio < 3 ? "bad" : "warn"} sub="Months of expenses covered" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">

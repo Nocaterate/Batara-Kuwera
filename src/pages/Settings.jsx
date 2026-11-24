@@ -5,6 +5,7 @@ import { useLang, LANGUAGES } from "../i18n.js";
 import { cn } from "../ui.js";
 import SoftWrap from "../SoftWrap.jsx";
 import { HealthBadge } from "../components/common.jsx";
+import KawungLayer from "../components/KawungLayer.jsx";
 import { InfoTip, Field, NumberField, AmountField, SelectField, Switch } from "../components/fields.jsx";
 import { RISK_LEVELS, FIELD_INFO, glossaryDef } from "../data.js";
 import { perksFor } from "../plans.js";
@@ -53,8 +54,8 @@ export function SettingsPage({ theme, setTheme, setLang, user, setUser, profile,
       </div>
 
       <section className={cn("overflow-hidden rounded-2xl border", T.panel, T.cardBorder)}>
-        <div className="relative px-5 py-5">
-          <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-red-600/10" style={{ filter: "blur(48px)" }} />
+        <div className="relative isolate px-5 py-5">
+          <KawungLayer from="right" className="inset-y-0 right-0 w-80" opacity={0.28} />
           <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
@@ -75,7 +76,7 @@ export function SettingsPage({ theme, setTheme, setLang, user, setUser, profile,
               { label: "Net worth", info: glossaryDef("Net worth"), value: money(metrics.netWorth) },
               { label: "Savings rate", info: glossaryDef("Savings rate"), value: fmt(metrics.savingsRate) + "%" },
             ].map((s) => (
-              <div key={s.label} className={cn("min-w-0 rounded-lg border px-3 py-2", T.border)}>
+              <div key={s.label} className={cn("min-w-0 rounded-lg border px-3 py-2", T.border, T.panel)}>
                 <div className={cn("flex items-center gap-1.5 text-xs", T.mutedText)}>
                   {t(s.label)}
                   <InfoTip label={s.label} text={s.info} T={T} />
