@@ -26,6 +26,7 @@ import CancelPlanModal from "./src/CancelPlan.jsx";
 import ScheduleModal, { SESSION_MINUTES, sessionPrice } from "./src/Schedule.jsx";
 import MySessions, { isRefundable } from "./src/MySessions.jsx";
 import { coachReply } from "./src/coach.js";
+import WhatIfSimulator from "./src/WhatIf.jsx";
 
 /* ---------------------------------------------------------------------- */
 /*  Tokens (fonts and the .font-display / .font-data classes live in index.html and src/index.css) */
@@ -249,12 +250,13 @@ function computeMetrics(p) {
   return { monthlyIncome, monthlyExpenses, totalAssetsOther, totalLiabilities, netWorth, emergencyFundRatio, dti, savingsRate, healthStatus };
 }
 
-function computeFireProjection(p, metrics) {
+// annualReturn: assumed yearly investment return (the dashboard uses 7%; the what-if simulator can change it).
+function computeFireProjection(p, metrics, annualReturn = 0.07) {
   const currentAge = num(p.age) || 25;
   const annualExpensesForFire = (num(p.monthlyLifestyleTarget) > 0 ? num(p.monthlyLifestyleTarget) : metrics.monthlyExpenses) * 12;
   const fireNumber = Math.max(annualExpensesForFire * 25, 0);
   const pmtMonthly = Math.max(metrics.monthlyIncome - metrics.monthlyExpenses, 0);
-  const rMonthly = 0.07 / 12;
+  const rMonthly = annualReturn / 12;
   let runningPv = num(p.liquidSavings) + num(p.investments) + num(p.realEstate);
 
   const yearly = [];
@@ -275,6 +277,12 @@ function computeFireProjection(p, metrics) {
 
   return { fireNumber, pmtMonthly, projectedFreedomAge, chartData, onTrack: monthsToFire !== null };
 }
+
+// Runs the engine on an adjusted profile, for the what-if simulator. Module-level so it's a stable reference.
+const simulateProfile = (p, annualReturn) => {
+  const metrics = computeMetrics(p);
+  return { metrics, fireData: computeFireProjection(p, metrics, annualReturn) };
+};
 
 /* ---------------------------------------------------------------------- */
 /*  Small shared UI pieces                                                 */
@@ -1171,6 +1179,8 @@ function DashboardPage({ profile, metrics, fireData, T }) {
           <p className={cn("mt-2 text-xs", T.mutedText)}>{t("Educational estimate assuming a 7% annual return — not a guarantee or financial advice.")}</p>
         </div>
       </div>
+
+      <WhatIfSimulator profile={profile} metrics={metrics} fireData={fireData} simulate={simulateProfile} T={T} />
 
       <div className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
         <h3 className={cn("mb-3 font-display text-sm font-semibold", T.text)}>{t("Glossary")}</h3>
