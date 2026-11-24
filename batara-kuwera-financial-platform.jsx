@@ -24,6 +24,7 @@ import { addPeriod, makeReference } from "./src/payments.js";
 import CheckoutModal from "./src/Checkout.jsx";
 import CancelPlanModal from "./src/CancelPlan.jsx";
 import ScheduleModal, { SESSION_MINUTES, sessionPrice } from "./src/Schedule.jsx";
+import MySessions, { isRefundable } from "./src/MySessions.jsx";
 
 /* ---------------------------------------------------------------------- */
 /*  Tokens (fonts and the .font-display / .font-data classes live in index.html and src/index.css) */
@@ -195,6 +196,7 @@ function normalizeSubscription(sub) {
 
 // Expert sessions saved on the account: { reference, expertId, expertName, typeId, typeLabel, startsAt, amount, paidAt, usedCredit }.
 // usedCredit marks a session booked with a plan's free monthly session (amount 0).
+// Cancelled sessions keep their record with status "cancelled", cancelledAt and refunded (see src/MySessions.jsx).
 const normalizeBookings = (list) =>
   Array.isArray(list) ? list.filter((b) => b && typeof b.startsAt === "number" && typeof b.reference === "string") : [];
 
@@ -1207,6 +1209,7 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
   const [checkout, setCheckout] = useState(null);
   const [topic, setTopic] = useState("all");
   const [sortBy, setSortBy] = useState("recommended");
+  const [tab, setTab] = useState("find");
 
   // Filter by topic, then sort; "recommended" keeps the roster's own order.
   const shownExperts = useMemo(() => {
@@ -1218,7 +1221,10 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
 
   const plan = TIERS.find((x) => x.id === subscriptionTier) ?? TIERS[0];
   const perks = perksFor(subscriptionTier);
-  const creditsLeft = Math.max(0, perks.freeSessions - bookings.filter((b) => b.usedCredit && monthKey(b.paidAt) === monthKey()).length);
+  // A free session cancelled in time (refunded) goes back into this month's allowance.
+  const creditsLeft = Math.max(0, perks.freeSessions - bookings.filter(
+    (b) => b.usedCredit && monthKey(b.paidAt) === monthKey() && !(b.status === "cancelled" && b.refunded)
+  ).length);
 
   // The viewer's price for one session: a free monthly session if one is left and covers this type,
   // otherwise the plan's discount (rounded to the nearest thousand rupiah).
@@ -1238,7 +1244,26 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
       : t("{plan}: {pct}% off every session. Your free sessions renew next month.", { plan: plan.name, pct });
 
   // Start times of the viewer's upcoming sessions, so the scheduler can block them.
-  const busySlots = useMemo(() => new Set(bookings.filter((b) => b.startsAt > Date.now()).map((b) => b.startsAt)), [bookings]);
+  const busySlots = useMemo(
+    () => new Set(bookings.filter((b) => b.status !== "cancelled" && b.startsAt > Date.now()).map((b) => b.startsAt)),
+    [bookings]
+  );
+  const upcomingCount = bookings.filter((b) => b.status !== "cancelled" && b.startsAt + SESSION_MINUTES * 60000 > Date.now()).length;
+  const photoFor = (expertId) => EXPERTS.find((x) => x.id === expertId)?.photo;
+
+  // The refund decision is made at the moment of cancelling, not when the dialog opened.
+  const cancelBooking = (reference) => {
+    const booking = bookings.find((b) => b.reference === reference);
+    if (!booking || booking.status === "cancelled" || booking.startsAt <= Date.now()) return;
+    const refunded = isRefundable(booking);
+    setBookings((list) => list.map((b) => (b.reference === reference ? { ...b, status: "cancelled", cancelledAt: Date.now(), refunded } : b)));
+    showToast(
+      !refunded ? "Session cancelled. It was within 24 hours, so it isn't refunded."
+        : booking.usedCredit ? "Session cancelled. Your free monthly session has been returned."
+          : "Session cancelled. {amount} will be refunded to your original payment method.",
+      { amount: money(booking.amount) }
+    );
+  };
 
   const startCheckout = (expert, { type, day, hour, notes }) => {
     const startsAt = new Date(day);
@@ -1259,8 +1284,9 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
   const handlePaid = (order, receipt, usedCredit = false) => {
     setBookings((list) => [...list, {
       reference: receipt.ref, expertId: order.expertId, expertName: order.expertName, typeId: order.typeId, typeLabel: order.typeLabel,
-      startsAt: order.startsAt, amount: receipt.amount, paidAt: receipt.at, usedCredit,
+      startsAt: order.startsAt, amount: receipt.amount, paidAt: receipt.at, usedCredit, status: "booked",
     }]);
+    setTab("mine");
     const d = new Date(order.startsAt);
     const when = d.toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { day: "numeric", month: "long" });
     showToast(
@@ -1287,6 +1313,30 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
         )}
       </div>
 
+      <div role="tablist" aria-label={t("Experts")} className={cn("flex gap-1 border-b", T.border)}>
+        {[["find", t("Find an expert")], ["mine", t("My sessions")]].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={cn(
+              "-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+              tab === id ? cn("border-red-600", T.text) : cn("border-transparent hover:text-red-500", T.subtext)
+            )}
+          >
+            {label}
+            {id === "mine" && upcomingCount > 0 && (
+              <span className="rounded-full bg-red-600 px-1.5 py-0.5 font-data text-[10px] font-semibold leading-none text-white">{upcomingCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "mine" && <MySessions bookings={bookings} photoFor={photoFor} onCancel={cancelBooking} onBrowse={() => setTab("find")} T={T} />}
+
+      {tab === "find" && (<>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2" role="group" aria-label={t("Filter by topic")}>
           {["all", ...EXPERT_TOPICS].map((x) => (
@@ -1355,6 +1405,7 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
           );
         })}
       </div>
+      </>)}
 
       {scheduling && (
         <ScheduleModal
