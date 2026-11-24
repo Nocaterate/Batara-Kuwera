@@ -27,6 +27,7 @@ import ScheduleModal, { SESSION_MINUTES, sessionPrice } from "./src/Schedule.jsx
 import MySessions, { isRefundable } from "./src/MySessions.jsx";
 import { coachReply } from "./src/coach.js";
 import DowngradePlanModal from "./src/DowngradePlan.jsx";
+import NextSessionCard from "./src/NextSession.jsx";
 import WhatIfSimulator from "./src/WhatIf.jsx";
 
 /* ---------------------------------------------------------------------- */
@@ -1102,7 +1103,9 @@ const DIAGNOSIS = {
   OPTIMAL: "Your fundamentals are strong across savings, buffer, and debt load. Focus now shifts to optimizing growth toward your FIRE target.",
 };
 
-function DashboardPage({ profile, metrics, fireData, subscriptionTier, setPage, T }) {
+const expertPhoto = (expertId) => EXPERTS.find((x) => x.id === expertId)?.photo;
+
+function DashboardPage({ profile, metrics, fireData, subscriptionTier, bookings, openMySessions, setPage, T }) {
   const { t, fmt, lang, money } = useLang();
   const pieData = [
     { name: t("Essentials"), value: profile.essentialExpenses, color: "#dc2626" },
@@ -1128,6 +1131,8 @@ function DashboardPage({ profile, metrics, fireData, subscriptionTier, setPage, 
         </div>
         <p className={cn("mt-3 text-sm", T.text)}>{t(DIAGNOSIS[metrics.healthStatus])}</p>
       </div>
+
+      <NextSessionCard bookings={bookings} photoFor={expertPhoto} onOpen={openMySessions} T={T} />
 
       <div className="grid grid-cols-1 gap-4 min-[400px]:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Wallet} label="Net worth" info={glossaryDef("Net worth")} value={money(metrics.netWorth)} T={T} tone={metrics.netWorth >= 0 ? "good" : "bad"} />
@@ -1217,13 +1222,14 @@ const EXPERT_SORTS = [
   { id: "rating", label: "Highest rated" },
 ];
 
-function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPage, T }) {
+// initialTab: "find" or "mine" (the dashboard's next-session card opens straight to "mine").
+function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPage, initialTab = "find", T }) {
   const { t, lang, money } = useLang();
   const [scheduling, setScheduling] = useState(null);
   const [checkout, setCheckout] = useState(null);
   const [topic, setTopic] = useState("all");
   const [sortBy, setSortBy] = useState("recommended");
-  const [tab, setTab] = useState("find");
+  const [tab, setTab] = useState(initialTab);
 
   // Filter by topic, then sort; "recommended" keeps the roster's own order.
   const shownExperts = useMemo(() => {
@@ -1263,7 +1269,6 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
     [bookings]
   );
   const upcomingCount = bookings.filter((b) => b.status !== "cancelled" && b.startsAt + SESSION_MINUTES * 60000 > Date.now()).length;
-  const photoFor = (expertId) => EXPERTS.find((x) => x.id === expertId)?.photo;
 
   // The refund decision is made at the moment of cancelling, not when the dialog opened.
   const cancelBooking = (reference) => {
@@ -1348,7 +1353,7 @@ function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast, setPa
         ))}
       </div>
 
-      {tab === "mine" && <MySessions bookings={bookings} refundHours={perks.refundHours} photoFor={photoFor} onCancel={cancelBooking} onBrowse={() => setTab("find")} T={T} />}
+      {tab === "mine" && <MySessions bookings={bookings} refundHours={perks.refundHours} photoFor={expertPhoto} onCancel={cancelBooking} onBrowse={() => setTab("find")} T={T} />}
 
       {tab === "find" && (<>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -2040,6 +2045,8 @@ export default function App() {
   const [subscription, setSubscription] = useState(init.subscription);
   const [bookings, setBookings] = useState(init.bookings);
   const [toast, setToast] = useState(null);
+  // Which Experts tab to open next; set by the dashboard card, reset by the sidebar.
+  const [expertsTab, setExpertsTab] = useState("find");
 
   const langValue = useMemo(() => ({ lang, t: makeT(lang), fmt: makeFmt(lang), money: makeMoney(lang) }), [lang]);
 
@@ -2196,9 +2203,12 @@ export default function App() {
       {page === "onboarding" && <OnboardingPage profile={profile} setProfile={setProfile} onComplete={handleOnboardingComplete} setLang={setLang} />}
 
       {AUTHED_PAGES.includes(page) && (
-        <AppShell page={page} setPage={setPage} onLogout={handleLogout} T={T} healthStatus={metrics.healthStatus} userName={profile.fullName || user.fullName} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
-          {page === "dashboard" && <DashboardPage profile={profile} metrics={metrics} fireData={fireData} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
-          {page === "experts" && <ExpertsPage subscriptionTier={subscription.tier} bookings={bookings} setBookings={setBookings} showToast={showToast} setPage={setPage} T={T} />}
+        <AppShell page={page} setPage={(p) => { setExpertsTab("find"); setPage(p); }} onLogout={handleLogout} T={T} healthStatus={metrics.healthStatus} userName={profile.fullName || user.fullName} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
+          {page === "dashboard" && <DashboardPage
+            profile={profile} metrics={metrics} fireData={fireData} subscriptionTier={subscription.tier} bookings={bookings}
+            openMySessions={() => { setExpertsTab("mine"); setPage("experts"); }} setPage={setPage} T={T}
+          />}
+          {page === "experts" && <ExpertsPage key={expertsTab} initialTab={expertsTab} subscriptionTier={subscription.tier} bookings={bookings} setBookings={setBookings} showToast={showToast} setPage={setPage} T={T} />}
           {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} showToast={showToast} T={T} />}
           {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
           {page === "chat" && <ChatPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
