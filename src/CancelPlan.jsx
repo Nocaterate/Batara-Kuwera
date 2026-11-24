@@ -170,7 +170,7 @@ export default function CancelPlanModal({ info, onConfirm, onClose, T }) {
               {[
                 [t("Cancelled plan"), info.planName],
                 [t("Cancelled on"), fmtDateTime(cancelledAt, lang)],
-                [t("Current plan"), "AI Assistant"],
+                [t("Current plan"), t("Free")],
               ].map(([k, v]) => (
                 <div key={k} className="flex items-start justify-between gap-4">
                   <dt className={T.subtext}>{k}</dt>

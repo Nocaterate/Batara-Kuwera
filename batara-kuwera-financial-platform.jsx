@@ -25,6 +25,7 @@ import CheckoutModal from "./src/Checkout.jsx";
 import CancelPlanModal from "./src/CancelPlan.jsx";
 import ScheduleModal, { SESSION_MINUTES, sessionPrice } from "./src/Schedule.jsx";
 import MySessions, { isRefundable } from "./src/MySessions.jsx";
+import { coachReply } from "./src/coach.js";
 
 /* ---------------------------------------------------------------------- */
 /*  Tokens (fonts and the .font-display / .font-data classes live in index.html and src/index.css) */
@@ -157,13 +158,13 @@ const EXPERTS = [
 
 const TIERS = [
   {
-    id: "ai", name: "AI Assistant", monthly: 0, tagline: "Get your bearings.",
-    features: ["Full dashboard access", "Automated financial health assessment", "AI Coach: 20 messages a day", "FIRE trajectory projections", "Book any expert at full price"],
+    id: "ai", name: "Free", monthly: 0, tagline: "Get your bearings.",
+    features: ["Full dashboard access", "Automated financial health assessment", "Unlimited Smart Coach chat", "FIRE trajectory projections", "Book any expert at full price"],
     excludes: ["PDF financial report"],
   },
   {
     id: "standard", name: "Expert Standard", monthly: 149000, tagline: "Bring in a human.",
-    features: ["Everything in AI Assistant", "1 free Normal Consultation every month", "10% off extra expert sessions", "Unlimited AI Coach chat", "PDF financial report"],
+    features: ["Everything in Free", "1 free Normal Consultation every month", "10% off extra expert sessions", "PDF financial report"],
   },
   {
     id: "pro", name: "Expert Pro", monthly: 399000, tagline: "Full wealth coverage.",
@@ -174,14 +175,13 @@ const TIERS = [
 // What each plan actually unlocks. Keep in step with the TIERS feature lists above.
 // freeTypes: consultation types a free monthly session can be used for (null = any type).
 const PLAN_PERKS = {
-  ai: { freeSessions: 0, freeTypes: [], discount: 0, daysAhead: 10, sameDay: false, aiDailyLimit: 20, pdfReport: false },
-  standard: { freeSessions: 1, freeTypes: ["normal"], discount: 0.1, daysAhead: 10, sameDay: false, aiDailyLimit: null, pdfReport: true },
-  pro: { freeSessions: 2, freeTypes: null, discount: 0.2, daysAhead: 30, sameDay: true, aiDailyLimit: null, pdfReport: true },
+  ai: { freeSessions: 0, freeTypes: [], discount: 0, daysAhead: 10, sameDay: false, pdfReport: false },
+  standard: { freeSessions: 1, freeTypes: ["normal"], discount: 0.1, daysAhead: 10, sameDay: false, pdfReport: true },
+  pro: { freeSessions: 2, freeTypes: null, discount: 0.2, daysAhead: 30, sameDay: true, pdfReport: true },
 };
 const perksFor = (tier) => PLAN_PERKS[tier] ?? PLAN_PERKS.ai;
 
-// Local calendar day / month keys: free sessions renew each calendar month, AI messages each day.
-const dayKey = (ts = Date.now()) => { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+// Local calendar month key: free sessions renew each calendar month.
 const monthKey = (ts = Date.now()) => { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth() + 1}`; };
 
 const TIER_RANK = { ai: 0, standard: 1, pro: 2 };
@@ -200,14 +200,13 @@ function normalizeSubscription(sub) {
 const normalizeBookings = (list) =>
   Array.isArray(list) ? list.filter((b) => b && typeof b.startsAt === "number" && typeof b.reference === "string") : [];
 
-const normalizeAiUsage = (u) =>
-  u && typeof u.day === "string" && Number.isInteger(u.count) ? u : { day: "", count: 0 };
-
+// Each suggestion goes straight to a coach topic (src/coach.js).
 const PROMPT_SUGGESTIONS = [
-  "How can I improve my savings rate?",
-  "Explain my financial freedom date",
-  "What's a healthy emergency fund for me?",
-  "Break down my DTI ratio",
+  { label: "How can I improve my savings rate?", topic: "savings" },
+  { label: "Explain my financial freedom date", topic: "fire" },
+  { label: "What's a healthy emergency fund for me?", topic: "emergency" },
+  { label: "Break down my DTI ratio", topic: "debt" },
+  { label: "How healthy are my finances overall?", topic: "health" },
 ];
 
 const emptyProfile = () => ({
@@ -1021,7 +1020,7 @@ const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "experts", label: "Experts", icon: Users },
   { id: "subscription", label: "Subscription", icon: Shield },
-  { id: "chat", label: "AI Coach", icon: MessageSquare },
+  { id: "chat", label: "Smart Coach", icon: MessageSquare },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -1496,7 +1495,7 @@ function SubscriptionPage({ subscription, setSubscription, setPage, T }) {
           <div className="relative flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className={cn("text-xs uppercase tracking-wider", T.mutedText)}>{t("Your plan")}</div>
-              <div className={cn("font-display text-xl font-bold", T.text)}>{currentTier.name}</div>
+              <div className={cn("font-display text-xl font-bold", T.text)}>{t(currentTier.name)}</div>
               <div className={cn("text-sm", T.subtext)}>
                 {t(subscription.cycle === "monthly" ? "Billed monthly" : "Billed annually")} · {t("Active until {date}", { date: dateText(subscription.expiresAt) })}
               </div>
@@ -1544,7 +1543,7 @@ function SubscriptionPage({ subscription, setSubscription, setPage, T }) {
           return (
             <div key={tier.id} className={cn("flex flex-col rounded-2xl border p-6 transition-opacity", T.panel, isCurrent ? "border-red-600" : T.cardBorder, isLower && "opacity-60")}>
               {isCurrent && <span className={cn("mb-2 w-fit rounded-full bg-red-600/15 px-2 py-0.5 font-data text-xs", T.accent)}>{t("Current plan")}</span>}
-              <h3 className={cn("font-display text-lg font-semibold", T.text)}>{tier.name}</h3>
+              <h3 className={cn("font-display text-lg font-semibold", T.text)}>{t(tier.name)}</h3>
               <p className={cn("text-sm", T.subtext)}>{t(tier.tagline)}</p>
               <div className={cn("mt-4 font-data text-3xl font-bold", T.text)}>
                 {price === 0 ? t("Free") : money(price)}
@@ -1869,71 +1868,45 @@ function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setPro
 /*  AI Chat page                                                           */
 /* ---------------------------------------------------------------------- */
 
-// aiDailyLimit: messages per day on this plan (null = unlimited). aiUsage: { day, count } saved on the account.
-function ChatPage({ metrics, fireData, aiDailyLimit, aiUsage, setAiUsage, setPage, T }) {
-  const { t, lang, money } = useLang();
-  const usedToday = aiUsage.day === dayKey() ? aiUsage.count : 0;
-  const remaining = aiDailyLimit === null ? Infinity : Math.max(0, aiDailyLimit - usedToday);
-  const outOfMessages = remaining === 0;
+// Smart Coach: answers come from src/coach.js, built from the user's own numbers.
+// No AI service or network involved, so it works anywhere and has no usage limit.
+function ChatPage({ profile, metrics, fireData, T }) {
+  const { t, lang, money, fmt } = useLang();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef(null);
+  const timerRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
+  useEffect(() => () => window.clearTimeout(timerRef.current), []);
 
-  const send = async (textOverride) => {
+  // topic: set when a suggestion is tapped, so the answer doesn't depend on keyword matching.
+  const send = (textOverride, topic) => {
     const text = (textOverride ?? input).trim();
-    if (!text || loading || outOfMessages) return;
-    setAiUsage((u) => (u.day === dayKey() ? { day: u.day, count: u.count + 1 } : { day: dayKey(), count: 1 }));
-    const newMessages = [...messages, { role: "user", content: text }];
-    setMessages(newMessages);
+    if (!text || loading) return;
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
     setLoading(true);
-
-    const contextSummary = metrics
-      ? `User's current anonymized financial snapshot — monthly income: ${money(metrics.monthlyIncome)}, monthly expenses: ${money(metrics.monthlyExpenses)}, savings rate: ${metrics.savingsRate.toFixed(1)}%, debt-to-income ratio: ${metrics.dti.toFixed(1)}%, emergency fund coverage: ${metrics.emergencyFundRatio.toFixed(1)} months, net worth: ${money(metrics.netWorth)}, financial health status: ${metrics.healthStatus}, FIRE number: ${money(fireData.fireNumber)}, projected financial freedom age: ${fireData.onTrack ? Math.round(fireData.projectedFreedomAge) : "not on track within the modeled horizon"}.`
-      : "The user has not completed their financial profile yet.";
-
-    const systemPrompt = `You are the Batara Kuwera AI Financial Coach: a friendly, empathetic, and knowledgeable guide helping a young adult build financial security. ${contextSummary} Personalize answers using these numbers when relevant. Keep replies concise (roughly 3-6 sentences unless the person asks for more detail), warm, practical, and light on jargon (briefly explain any term the first time you use it). You are not a certified financial, legal, or tax advisor — for complex or high-stakes decisions, suggest the person also consult a licensed professional or one of Batara Kuwera's expert advisors.${lang === "id" ? " Always reply in Bahasa Indonesia." : ""}`;
-
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-        }),
-      });
-      const data = await response.json();
-      const textBlocks = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-      setMessages((prev) => [...prev, { role: "assistant", content: textBlocks || t("I couldn't quite generate a response there — mind trying again?") }]);
-    } catch (err) {
-      setMessages((prev) => [...prev, { role: "assistant", content: t("I'm having trouble connecting right now. Please try again in a moment.") }]);
-    } finally {
+    const reply = coachReply(text, { profile, metrics, fireData, lang, money, fmt, topic });
+    // A short pause so the reply doesn't appear in the same instant as the question.
+    timerRef.current = window.setTimeout(() => {
+      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
       setLoading(false);
-    }
+    }, 450);
   };
 
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col">
       <div>
-        <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("AI Coach")}</h1>
-        <p className={cn("text-sm", T.subtext)}>{t("Context-aware guidance based on your live financial profile.")}</p>
+        <h1 className={cn("font-display text-2xl font-bold", T.text)}>{t("Smart Coach")}</h1>
+        <p className={cn("text-sm", T.subtext)}>{t("Guidance built from the numbers in your financial profile.")}</p>
       </div>
 
-      <div className={cn("my-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs", T.notice)}>
-        <Info size={14} className="mt-0.5 shrink-0" />
-        {t("Batara Kuwera's AI Coach gives educational financial guidance — not certified legal, tax, or investment advice.")}
-      </div>
-
-      <div className={cn("flex-1 space-y-3 overflow-y-auto rounded-2xl border p-4", T.panel, T.cardBorder)} style={{ minHeight: 320, maxHeight: 460 }}>
+      <div className={cn("mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl border p-4", T.panel, T.cardBorder)} style={{ minHeight: 320, maxHeight: 460 }}>
         <div className="flex justify-start">
           <div style={{ maxWidth: "85%" }} className={cn("whitespace-pre-wrap rounded-2xl border px-3.5 py-2.5 text-sm", T.border, T.text)}>
-            {t("Hi, I'm your Batara Kuwera AI Coach. Ask me anything about your numbers, or pick a suggestion below to get started.")}
+            {t("Hi, I'm your Batara Kuwera Smart Coach. Ask me about your savings, emergency fund, debt, net worth, budget or FIRE date, or pick a suggestion below.")}
           </div>
         </div>
         {messages.map((m, i) => (
@@ -1961,8 +1934,8 @@ function ChatPage({ metrics, fireData, aiDailyLimit, aiUsage, setAiUsage, setPag
 
       <div className="mt-3 flex flex-wrap gap-2">
         {PROMPT_SUGGESTIONS.map((s) => (
-          <button key={s} onClick={() => send(t(s))} disabled={loading || outOfMessages} className={cn("rounded-full border px-3 py-1.5 text-xs transition-colors", T.border, T.subtext, T.hoverBg)}>
-            {t(s)}
+          <button key={s.label} onClick={() => send(t(s.label), s.topic)} disabled={loading} className={cn("rounded-full border px-3 py-1.5 text-xs transition-colors", T.border, T.subtext, T.hoverBg)}>
+            {t(s.label)}
           </button>
         ))}
       </div>
@@ -1972,22 +1945,12 @@ function ChatPage({ metrics, fireData, aiDailyLimit, aiUsage, setAiUsage, setPag
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={t("Ask about your savings, debt, or FIRE date…")}
-          disabled={outOfMessages}
           className={cn("flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none focus:border-red-600", T.inputBg, T.inputBorder, T.text)}
         />
-        <button type="submit" disabled={loading || outOfMessages} className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50">
+        <button type="submit" disabled={loading} className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50">
           <Send size={15} />
         </button>
       </form>
-
-      {aiDailyLimit !== null && (
-        <p className={cn("mt-2 flex flex-wrap items-center gap-x-2 text-xs", outOfMessages ? T.warn : T.mutedText)}>
-          {outOfMessages
-            ? t("You've used today's {limit} AI Coach messages. Upgrade for unlimited chat, or come back tomorrow.", { limit: aiDailyLimit })
-            : t("{n} of {limit} AI Coach messages left today.", { n: remaining, limit: aiDailyLimit })}
-          <button type="button" onClick={() => setPage("subscription")} className={cn("font-semibold hover:underline", T.accent)}>{t("Upgrade")}</button>
-        </p>
-      )}
     </div>
   );
 }
@@ -2010,7 +1973,6 @@ function loadInitialState() {
     hasProfile,
     subscription: normalizeSubscription(account.subscription),
     bookings: normalizeBookings(account.bookings),
-    aiUsage: normalizeAiUsage(account.aiUsage),
     theme: ["dark", "light", "system"].includes(prefs.theme) ? prefs.theme : "dark",
     lang: LANGUAGES.some((l) => l.id === prefs.lang) ? prefs.lang : "en",
   };
@@ -2028,7 +1990,6 @@ export default function App() {
   const [lang, setLang] = useState(init.lang);
   const [subscription, setSubscription] = useState(init.subscription);
   const [bookings, setBookings] = useState(init.bookings);
-  const [aiUsage, setAiUsage] = useState(init.aiUsage);
   const [toast, setToast] = useState(null);
 
   const langValue = useMemo(() => ({ lang, t: makeT(lang), fmt: makeFmt(lang), money: makeMoney(lang) }), [lang]);
@@ -2041,8 +2002,8 @@ export default function App() {
   }, [theme, lang]);
 
   useEffect(() => {
-    if (session) saveAccount(session.email, { user, profile, hasProfile, subscription, bookings, aiUsage });
-  }, [session, user, profile, hasProfile, subscription, bookings, aiUsage]);
+    if (session) saveAccount(session.email, { user, profile, hasProfile, subscription, bookings });
+  }, [session, user, profile, hasProfile, subscription, bookings]);
 
   const resetAccountState = () => {
     setUser({ fullName: "", email: "" });
@@ -2050,7 +2011,6 @@ export default function App() {
     setHasProfile(false);
     setSubscription(FREE_SUBSCRIPTION);
     setBookings([]);
-    setAiUsage(normalizeAiUsage(null));
   };
 
   // When a paid plan reaches its due date the account drops back to the free plan.
@@ -2110,7 +2070,6 @@ export default function App() {
     setHasProfile(!!account.hasProfile);
     setSubscription(normalizeSubscription(account.subscription));
     setBookings(normalizeBookings(account.bookings));
-    setAiUsage(normalizeAiUsage(account.aiUsage));
     setSession(startSession(result.email, remember));
     if (account.hasProfile) {
       setPage("dashboard");
@@ -2185,7 +2144,7 @@ export default function App() {
           {page === "experts" && <ExpertsPage subscriptionTier={subscription.tier} bookings={bookings} setBookings={setBookings} showToast={showToast} setPage={setPage} T={T} />}
           {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} T={T} />}
           {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
-          {page === "chat" && <ChatPage metrics={metrics} fireData={fireData} aiDailyLimit={perksFor(subscription.tier).aiDailyLimit} aiUsage={aiUsage} setAiUsage={setAiUsage} setPage={setPage} T={T} />}
+          {page === "chat" && <ChatPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
         </AppShell>
       )}
 
