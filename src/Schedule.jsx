@@ -150,7 +150,7 @@ function TypeStep({ expert, quote, perksNote, onPick, T }) {
 // busySlots: start timestamps of the viewer's own paid sessions (with any expert), so they
 // can't book the same slot twice or be in two sessions at once.
 // daysAhead / sameDay come from the viewer's plan (Expert Pro books further ahead and same-day).
-function DateTimeStep({ expert, type, initialDay, initialHour, busySlots, daysAhead, sameDay, onBack, onPick, T }) {
+function DateTimeStep({ expert, initialDay, initialHour, busySlots, daysAhead, sameDay, onBack, onPick, T }) {
   const { t, lang } = useLang();
   const days = useMemo(
     () => Array.from({ length: daysAhead }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i + (sameDay ? 0 : 1)); d.setHours(0, 0, 0, 0); return d; }),
@@ -307,7 +307,7 @@ export default function ScheduleModal({ expert, busySlots, quote, perksNote, day
         {step === "type" && <TypeStep expert={expert} quote={quote} perksNote={perksNote} onPick={(t) => { setType(t); setStep("datetime"); }} T={T} />}
         {step === "datetime" && (
           <DateTimeStep
-            expert={expert} type={type} initialDay={day} initialHour={hour} busySlots={busySlots}
+            expert={expert} initialDay={day} initialHour={hour} busySlots={busySlots}
             daysAhead={daysAhead} sameDay={sameDay} onBack={() => setStep("type")}
             onPick={(d, h) => { setDay(d); setHour(h); setStep("confirm"); }}
             T={T}

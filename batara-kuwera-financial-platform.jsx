@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useLayoutEffect, useId } from "react";
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect, useId, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Shield, ShieldCheck, ShieldAlert, ShieldQuestion, TrendingUp, Wallet,
@@ -549,7 +549,7 @@ function SelectField({ label, info, value, onChange, options, T }) {
   );
 }
 
-function Switch({ checked, onChange, T }) {
+function Switch({ checked, onChange }) {
   return (
     <button
       type="button"
@@ -1123,7 +1123,7 @@ function DashboardPage({ profile, metrics, fireData, T }) {
         <StatCard icon={Wallet} label="Net worth" info={glossaryDef("Net worth")} value={money(metrics.netWorth)} T={T} tone={metrics.netWorth >= 0 ? "good" : "bad"} />
         <StatCard icon={TrendingUp} label="Savings rate" info={glossaryDef("Savings rate")} value={`${fmt(metrics.savingsRate)}%`} T={T} tone={metrics.savingsRate > 30 ? "good" : metrics.savingsRate < 10 ? "bad" : "warn"} />
         <StatCard icon={CreditCard} label="Debt-to-income" info={glossaryDef("DTI ratio")} value={`${fmt(metrics.dti)}%`} T={T} tone={metrics.dti < 20 ? "good" : metrics.dti > 40 ? "bad" : "warn"} />
-        <StatCard icon={PiggyBank} label="Emergency fund" info={glossaryDef("Emergency fund")} value={`${fmt(metrics.emergencyFundRatio)} ${t("mo")}`} T={T} tone={metrics.emergencyFundRatio > 6 ? "good" : metrics.emergencyFundRatio < 3 ? "bad" : "warn"} sub="Months of expenses covered" />
+        <StatCard icon={PiggyBank} label="Emergency fund" info={glossaryDef("Emergency fund")} value={`${fmt(metrics.emergencyFundRatio)}\u00A0${t("mo")}`} T={T} tone={metrics.emergencyFundRatio > 6 ? "good" : metrics.emergencyFundRatio < 3 ? "bad" : "warn"} sub="Months of expenses covered" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
@@ -1804,7 +1804,7 @@ function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setPro
               <div className={cn("text-sm", T.text)}>{t("Two-factor authentication")}</div>
               <div className={cn("text-xs", T.mutedText)}>{t("Add an extra step when signing in.")}</div>
             </div>
-            <Switch checked={twoFA} onChange={setTwoFA} T={T} />
+            <Switch checked={twoFA} onChange={setTwoFA} />
           </div>
         </div>
       </section>
@@ -1840,7 +1840,7 @@ function SettingsPage({ theme, setTheme, setLang, user, setUser, profile, setPro
               <div className={cn("text-sm", T.text)}>{t("Monthly health check emails")}</div>
               <div className={cn("text-xs", T.mutedText)}>{t("A summary of your metrics, once a month.")}</div>
             </div>
-            <Switch checked={notifEmail} onChange={setNotifEmail} T={T} />
+            <Switch checked={notifEmail} onChange={setNotifEmail} />
           </div>
         </div>
       </section>
@@ -1994,7 +1994,15 @@ export default function App() {
 
   const langValue = useMemo(() => ({ lang, t: makeT(lang), fmt: makeFmt(lang), money: makeMoney(lang) }), [lang]);
 
-  const showToast = (key, vars) => { setToast({ key, vars }); window.clearTimeout(showToast._t); showToast._t = window.setTimeout(() => setToast(null), 3200); };
+  // Stable across renders, and the hide timer lives in a ref, so a new toast always cancels the
+  // previous one's timer and stays up for its full 3.2 s.
+  const toastTimer = useRef(null);
+  const showToast = useCallback((key, vars) => {
+    setToast({ key, vars });
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 3200);
+  }, []);
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
   useEffect(() => {
     savePrefs({ theme, lang });
@@ -2026,7 +2034,7 @@ export default function App() {
     check();
     const id = window.setInterval(check, 30000);
     return () => window.clearInterval(id);
-  }, [session, subscription]);
+  }, [session, subscription, showToast]);
 
   useEffect(() => {
     if (!session) return undefined;
@@ -2041,7 +2049,7 @@ export default function App() {
     if (remaining <= 0) { expire(); return undefined; }
     const id = window.setTimeout(expire, remaining);
     return () => window.clearTimeout(id);
-  }, [session]);
+  }, [session, showToast]);
 
   const metrics = useMemo(() => computeMetrics(profile), [profile]);
   const fireData = useMemo(() => computeFireProjection(profile, metrics), [profile, metrics]);

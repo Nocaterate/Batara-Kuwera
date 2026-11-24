@@ -120,7 +120,7 @@ const REPLIES = {
   },
 
   fire(c) {
-    const { m, f, money, fmt, p } = c;
+    const { f, money, p } = c;
     const age = c.n(p.age) || 25;
     const target = c.n(p.targetRetirementAge);
     const intro = {
