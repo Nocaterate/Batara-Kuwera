@@ -5,7 +5,7 @@ import {
   PiggyBank, CreditCard, LayoutDashboard, Users, Settings as SettingsIcon,
   MessageSquare, LogOut, Sun, Moon, Monitor, ChevronRight, ChevronLeft, Check,
   AlertTriangle, Download, Trash2, Send, Star, Eye, EyeOff, Info, Menu, X,
-  Sparkles, Github, Lock,
+  Sparkles, Github, Lock, Target,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Sector, ResponsiveContainer, ComposedChart, Area, Line,
@@ -28,6 +28,7 @@ import MySessions, { isRefundable } from "./src/MySessions.jsx";
 import { coachReply } from "./src/coach.js";
 import DowngradePlanModal from "./src/DowngradePlan.jsx";
 import NextSessionCard from "./src/NextSession.jsx";
+import GoalsPage, { TopGoalCard } from "./src/Goals.jsx";
 import WhatIfSimulator from "./src/WhatIf.jsx";
 
 /* ---------------------------------------------------------------------- */
@@ -162,12 +163,12 @@ const EXPERTS = [
 const TIERS = [
   {
     id: "ai", name: "Free", monthly: 0, tagline: "Get your bearings.",
-    features: ["Full dashboard access", "Automated financial health assessment", "Unlimited Smart Coach chat", "FIRE trajectory projections", "Basic what-if simulator", "Book any expert at full price"],
+    features: ["Full dashboard access", "Automated financial health assessment", "Unlimited Smart Coach chat", "FIRE trajectory projections", "Basic what-if simulator", "1 savings goal", "Book any expert at full price"],
     excludes: ["PDF financial report"],
   },
   {
     id: "standard", name: "Expert Standard", monthly: 149000, tagline: "Bring in a human.",
-    features: ["Everything in Free", "1 free Normal Consultation every month", "15% off extra expert sessions", "Full what-if simulator", "PDF financial report"],
+    features: ["Everything in Free", "1 free Normal Consultation every month", "15% off extra expert sessions", "Full what-if simulator", "Unlimited savings goals", "PDF financial report"],
   },
   {
     id: "pro", name: "Expert Pro", monthly: 399000, tagline: "For specialist advice.",
@@ -179,9 +180,9 @@ const TIERS = [
 // freeTypes: consultation types a free monthly session can be used for (null = any type).
 // refundHours: cancel a session at least this long before it starts for a full refund.
 const PLAN_PERKS = {
-  ai: { freeSessions: 0, freeTypes: [], discount: 0, daysAhead: 10, sameDay: false, pdfReport: false, fullSimulator: false, refundHours: 24 },
-  standard: { freeSessions: 1, freeTypes: ["normal"], discount: 0.15, daysAhead: 10, sameDay: false, pdfReport: true, fullSimulator: true, refundHours: 24 },
-  pro: { freeSessions: 2, freeTypes: null, discount: 0.2, daysAhead: 30, sameDay: true, pdfReport: true, fullSimulator: true, refundHours: 2 },
+  ai: { freeSessions: 0, freeTypes: [], discount: 0, daysAhead: 10, sameDay: false, pdfReport: false, fullSimulator: false, refundHours: 24, maxGoals: 1 },
+  standard: { freeSessions: 1, freeTypes: ["normal"], discount: 0.15, daysAhead: 10, sameDay: false, pdfReport: true, fullSimulator: true, refundHours: 24, maxGoals: null },
+  pro: { freeSessions: 2, freeTypes: null, discount: 0.2, daysAhead: 30, sameDay: true, pdfReport: true, fullSimulator: true, refundHours: 2, maxGoals: null },
 };
 const perksFor = (tier) => PLAN_PERKS[tier] ?? PLAN_PERKS.ai;
 
@@ -205,6 +206,13 @@ const normalizeBookings = (list) =>
   Array.isArray(list) ? list.filter((b) => b && typeof b.startsAt === "number" && typeof b.reference === "string") : [];
 
 // Each suggestion goes straight to a coach topic (src/coach.js).
+// Savings goals saved on the account (see src/Goals.jsx).
+const normalizeGoals = (list) =>
+  Array.isArray(list)
+    ? list.filter((g) => g && typeof g.id === "string" && typeof g.name === "string" && g.target > 0)
+      .map((g) => ({ ...g, targetDate: typeof g.targetDate === "number" ? g.targetDate : null, deposits: Array.isArray(g.deposits) ? g.deposits.filter((d) => d && d.amount > 0) : [] }))
+    : [];
+
 const PROMPT_SUGGESTIONS = [
   { label: "How can I improve my savings rate?", topic: "savings" },
   { label: "Explain my financial freedom date", topic: "fire" },
@@ -1029,6 +1037,7 @@ function OnboardingPage({ profile, setProfile, onComplete, setLang }) {
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "goals", label: "Goals", icon: Target },
   { id: "experts", label: "Experts", icon: Users },
   { id: "subscription", label: "Subscription", icon: Shield },
   { id: "chat", label: "Smart Coach", icon: MessageSquare },
@@ -1105,7 +1114,7 @@ const DIAGNOSIS = {
 
 const expertPhoto = (expertId) => EXPERTS.find((x) => x.id === expertId)?.photo;
 
-function DashboardPage({ profile, metrics, fireData, subscriptionTier, bookings, openMySessions, setPage, T }) {
+function DashboardPage({ profile, metrics, fireData, subscriptionTier, bookings, goals, openMySessions, setPage, T }) {
   const { t, fmt, lang, money } = useLang();
   const pieData = [
     { name: t("Essentials"), value: profile.essentialExpenses, color: "#dc2626" },
@@ -1132,7 +1141,10 @@ function DashboardPage({ profile, metrics, fireData, subscriptionTier, bookings,
         <p className={cn("mt-3 text-sm", T.text)}>{t(DIAGNOSIS[metrics.healthStatus])}</p>
       </div>
 
-      <NextSessionCard bookings={bookings} photoFor={expertPhoto} onOpen={openMySessions} T={T} />
+      <div className="flex flex-col gap-4 empty:hidden lg:flex-row lg:[&>*]:flex-1">
+        <NextSessionCard bookings={bookings} photoFor={expertPhoto} onOpen={openMySessions} T={T} />
+        <TopGoalCard goals={goals} onOpen={() => setPage("goals")} T={T} />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 min-[400px]:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Wallet} label="Net worth" info={glossaryDef("Net worth")} value={money(metrics.netWorth)} T={T} tone={metrics.netWorth >= 0 ? "good" : "bad"} />
@@ -2027,6 +2039,7 @@ function loadInitialState() {
     hasProfile,
     subscription: normalizeSubscription(account.subscription),
     bookings: normalizeBookings(account.bookings),
+    goals: normalizeGoals(account.goals),
     theme: ["dark", "light", "system"].includes(prefs.theme) ? prefs.theme : "dark",
     lang: LANGUAGES.some((l) => l.id === prefs.lang) ? prefs.lang : "en",
   };
@@ -2044,6 +2057,7 @@ export default function App() {
   const [lang, setLang] = useState(init.lang);
   const [subscription, setSubscription] = useState(init.subscription);
   const [bookings, setBookings] = useState(init.bookings);
+  const [goals, setGoals] = useState(init.goals);
   const [toast, setToast] = useState(null);
   // Which Experts tab to open next; set by the dashboard card, reset by the sidebar.
   const [expertsTab, setExpertsTab] = useState("find");
@@ -2066,8 +2080,8 @@ export default function App() {
   }, [theme, lang]);
 
   useEffect(() => {
-    if (session) saveAccount(session.email, { user, profile, hasProfile, subscription, bookings });
-  }, [session, user, profile, hasProfile, subscription, bookings]);
+    if (session) saveAccount(session.email, { user, profile, hasProfile, subscription, bookings, goals });
+  }, [session, user, profile, hasProfile, subscription, bookings, goals]);
 
   const resetAccountState = () => {
     setUser({ fullName: "", email: "" });
@@ -2075,6 +2089,7 @@ export default function App() {
     setHasProfile(false);
     setSubscription(FREE_SUBSCRIPTION);
     setBookings([]);
+    setGoals([]);
   };
 
   // When a paid plan reaches its due date the account drops back to the free plan.
@@ -2134,6 +2149,7 @@ export default function App() {
     setHasProfile(!!account.hasProfile);
     setSubscription(normalizeSubscription(account.subscription));
     setBookings(normalizeBookings(account.bookings));
+    setGoals(normalizeGoals(account.goals));
     setSession(startSession(result.email, remember));
     if (account.hasProfile) {
       setPage("dashboard");
@@ -2184,7 +2200,7 @@ export default function App() {
     setPage("login");
   };
 
-  const AUTHED_PAGES = ["dashboard", "experts", "subscription", "settings", "chat"];
+  const AUTHED_PAGES = ["dashboard", "goals", "experts", "subscription", "settings", "chat"];
 
   // Paint the page itself (not just the app) so refresh and overscroll never flash white.
   // Login, register and onboarding are always dark; only the signed-in pages follow the theme.
@@ -2205,9 +2221,15 @@ export default function App() {
       {AUTHED_PAGES.includes(page) && (
         <AppShell page={page} setPage={(p) => { setExpertsTab("find"); setPage(p); }} onLogout={handleLogout} T={T} healthStatus={metrics.healthStatus} userName={profile.fullName || user.fullName} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
           {page === "dashboard" && <DashboardPage
-            profile={profile} metrics={metrics} fireData={fireData} subscriptionTier={subscription.tier} bookings={bookings}
+            profile={profile} metrics={metrics} fireData={fireData} subscriptionTier={subscription.tier} bookings={bookings} goals={goals}
             openMySessions={() => { setExpertsTab("mine"); setPage("experts"); }} setPage={setPage} T={T}
           />}
+          {page === "goals" && (
+            <GoalsPage
+              goals={goals} setGoals={setGoals} maxGoals={perksFor(subscription.tier).maxGoals}
+              monthlySurplus={metrics.monthlyIncome - metrics.monthlyExpenses} setPage={setPage} showToast={showToast} AmountField={AmountField} T={T}
+            />
+          )}
           {page === "experts" && <ExpertsPage key={expertsTab} initialTab={expertsTab} subscriptionTier={subscription.tier} bookings={bookings} setBookings={setBookings} showToast={showToast} setPage={setPage} T={T} />}
           {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} showToast={showToast} T={T} />}
           {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
