@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ArrowRight, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, Lock, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 import { useLang } from "./i18n.js";
 import { compactShort } from "./numberFormat.js";
@@ -9,17 +9,21 @@ const DEFAULT_RETURN = 7;
 const NO_CHANGE = { extraIncome: 0, cutDiscretionary: 0, annualReturn: DEFAULT_RETURN };
 const roundUpTo = (v, step) => Math.ceil(v / step) * step;
 
-function Slider({ label, value, min, max, step, display, onChange, T }) {
+// locked: shown but disabled, with the plan that unlocks it.
+function Slider({ label, value, min, max, step, display, onChange, locked, T }) {
   return (
-    <label className="block">
+    <label className={cn("block", locked && "opacity-60")}>
       <span className="mb-1.5 flex items-baseline justify-between gap-3 text-xs">
-        <span className={T.subtext}>{label}</span>
+        <span className={cn("inline-flex items-center gap-1.5", T.subtext)}>
+          {locked && <Lock size={11} />} {label}
+          {locked && <span className={cn("rounded border px-1.5 py-0.5 text-[10px]", T.border, T.mutedText)}>Expert Standard</span>}
+        </span>
         <span className={cn("font-data text-sm font-semibold", T.text)}>{display}</span>
       </span>
       <input
-        type="range" min={min} max={max} step={step} value={value}
+        type="range" min={min} max={max} step={step} value={value} disabled={locked}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-2 w-full cursor-pointer accent-red-600"
+        className={cn("h-2 w-full accent-red-600", locked ? "cursor-not-allowed" : "cursor-pointer")}
       />
     </label>
   );
@@ -41,11 +45,15 @@ function CompareRow({ label, now, next, better, T }) {
 /**
  * "What if…" simulator for the dashboard. Nothing is saved: it re-runs the app's own engine on an
  * adjusted copy of the profile. simulate(profile, annualReturn) -> { metrics, fireData }.
+ * Freemium: without fullAccess only the extra-income slider and the headline work; the other
+ * sliders, the comparison table and the chart need Expert Standard or Pro (onUpgrade opens plans).
  */
-export default function WhatIfSimulator({ profile, metrics, fireData, simulate, T }) {
+export default function WhatIfSimulator({ profile, metrics, fireData, simulate, fullAccess, onUpgrade, T }) {
   const { t, fmt, lang, money } = useLang();
   const [s, setS] = useState(NO_CHANGE);
   const set = (k) => (v) => setS((x) => ({ ...x, [k]: v }));
+  // On the free plan the locked sliders always count as "no change", even if they were moved earlier.
+  const eff = fullAccess ? s : { ...s, cutDiscretionary: NO_CHANGE.cutDiscretionary, annualReturn: NO_CHANGE.annualReturn };
 
   const num = (v) => { const x = typeof v === "number" ? v : parseFloat(v); return Number.isFinite(x) ? x : 0; };
   const disc = num(profile.discretionaryExpenses);
@@ -54,11 +62,11 @@ export default function WhatIfSimulator({ profile, metrics, fireData, simulate, 
   const sim = useMemo(() => {
     const adjusted = {
       ...profile,
-      sideIncome: num(profile.sideIncome) + s.extraIncome,
-      discretionaryExpenses: disc * (1 - s.cutDiscretionary / 100),
+      sideIncome: num(profile.sideIncome) + eff.extraIncome,
+      discretionaryExpenses: disc * (1 - eff.cutDiscretionary / 100),
     };
-    return simulate(adjusted, s.annualReturn / 100);
-  }, [profile, s, disc, simulate]);
+    return simulate(adjusted, eff.annualReturn / 100);
+  }, [profile, eff.extraIncome, eff.cutDiscretionary, eff.annualReturn, disc, simulate]);
   const m2 = sim.metrics, f2 = sim.fireData;
 
   // Both trajectories on one chart, matched by age.
@@ -81,7 +89,7 @@ export default function WhatIfSimulator({ profile, metrics, fireData, simulate, 
 
   const surplus = (m) => m.monthlyIncome - m.monthlyExpenses;
   const ageLabel = (f) => (f.onTrack ? `${Math.round(f.projectedFreedomAge)}` : t("not reached"));
-  const changed = s.extraIncome !== 0 || s.cutDiscretionary !== 0 || s.annualReturn !== DEFAULT_RETURN;
+  const changed = eff.extraIncome !== 0 || eff.cutDiscretionary !== 0 || eff.annualReturn !== DEFAULT_RETURN;
 
   // Headline: how far the financial freedom age moves.
   let headline;
@@ -113,22 +121,23 @@ export default function WhatIfSimulator({ profile, metrics, fireData, simulate, 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-5">
           <Slider
-            label={t("Extra income per month")} value={s.extraIncome} min={0} max={incomeMax} step={50000}
-            display={`+${money(s.extraIncome)}`} onChange={set("extraIncome")} T={T}
+            label={t("Extra income per month")} value={eff.extraIncome} min={0} max={incomeMax} step={50000}
+            display={`+${money(eff.extraIncome)}`} onChange={set("extraIncome")} T={T}
           />
           <Slider
-            label={t("Cut discretionary spending")} value={s.cutDiscretionary} min={0} max={100} step={5}
-            display={`${s.cutDiscretionary}% · −${money((disc * s.cutDiscretionary) / 100)}`} onChange={set("cutDiscretionary")} T={T}
+            label={t("Cut discretionary spending")} value={eff.cutDiscretionary} min={0} max={100} step={5}
+            display={`${eff.cutDiscretionary}% · −${money((disc * eff.cutDiscretionary) / 100)}`} onChange={set("cutDiscretionary")} locked={!fullAccess} T={T}
           />
           <Slider
-            label={t("Expected yearly return")} value={s.annualReturn} min={2} max={12} step={0.5}
-            display={`${fmt(s.annualReturn, 1)}%`} onChange={set("annualReturn")} T={T}
+            label={t("Expected yearly return")} value={eff.annualReturn} min={2} max={12} step={0.5}
+            display={`${fmt(eff.annualReturn, 1)}%`} onChange={set("annualReturn")} locked={!fullAccess} T={T}
           />
         </div>
 
         <div>
           <p className={cn("mb-2 text-sm font-semibold", tone)}>{headline}</p>
-          <div className={cn("divide-y rounded-xl border px-4", T.border, "divide-zinc-500/20")}>
+          <div className="relative">
+          <div aria-hidden={!fullAccess} className={cn("divide-y rounded-xl border px-4", T.border, "divide-zinc-500/20", !fullAccess && "pointer-events-none select-none blur-sm")}>
             <CompareRow label={t("Monthly surplus")} now={money(surplus(metrics))} next={money(surplus(m2))} better={changed ? surplus(m2) > surplus(metrics) : undefined} T={T} />
             <CompareRow label={t("Savings rate")} now={`${fmt(metrics.savingsRate)}%`} next={`${fmt(m2.savingsRate)}%`} better={changed ? m2.savingsRate > metrics.savingsRate : undefined} T={T} />
             <CompareRow label={t("FIRE target")} now={compactShort(fireData.fireNumber, lang)} next={compactShort(f2.fireNumber, lang)} better={changed && f2.fireNumber !== fireData.fireNumber ? f2.fireNumber < fireData.fireNumber : undefined} T={T} />
@@ -139,9 +148,18 @@ export default function WhatIfSimulator({ profile, metrics, fireData, simulate, 
               T={T}
             />
           </div>
+          {!fullAccess && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl p-4 text-center">
+              <span className={cn("flex items-center gap-1.5 text-sm font-semibold", T.text)}><Lock size={14} /> {t("Full comparison and chart")}</span>
+              <span className={cn("text-xs", T.subtext)}>{t("Unlock every slider, the before/after table and the chart with Expert Standard or Pro.")}</span>
+              <button type="button" onClick={onUpgrade} className="mt-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500">{t("See plans")}</button>
+            </div>
+          )}
+          </div>
         </div>
       </div>
 
+      {fullAccess && (<>
       <div className="mt-5 h-56">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData}>
@@ -162,6 +180,7 @@ export default function WhatIfSimulator({ profile, metrics, fireData, simulate, 
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      </>)}
       <p className={cn("mt-2 text-xs", T.mutedText)}>{t("Educational estimate, not a guarantee or financial advice.")}</p>
     </div>
   );

@@ -160,12 +160,12 @@ const EXPERTS = [
 const TIERS = [
   {
     id: "ai", name: "Free", monthly: 0, tagline: "Get your bearings.",
-    features: ["Full dashboard access", "Automated financial health assessment", "Unlimited Smart Coach chat", "FIRE trajectory projections", "Book any expert at full price"],
+    features: ["Full dashboard access", "Automated financial health assessment", "Unlimited Smart Coach chat", "FIRE trajectory projections", "Basic what-if simulator", "Book any expert at full price"],
     excludes: ["PDF financial report"],
   },
   {
     id: "standard", name: "Expert Standard", monthly: 149000, tagline: "Bring in a human.",
-    features: ["Everything in Free", "1 free Normal Consultation every month", "10% off extra expert sessions", "PDF financial report"],
+    features: ["Everything in Free", "1 free Normal Consultation every month", "10% off extra expert sessions", "Full what-if simulator", "PDF financial report"],
   },
   {
     id: "pro", name: "Expert Pro", monthly: 399000, tagline: "Full wealth coverage.",
@@ -176,9 +176,9 @@ const TIERS = [
 // What each plan actually unlocks. Keep in step with the TIERS feature lists above.
 // freeTypes: consultation types a free monthly session can be used for (null = any type).
 const PLAN_PERKS = {
-  ai: { freeSessions: 0, freeTypes: [], discount: 0, daysAhead: 10, sameDay: false, pdfReport: false },
-  standard: { freeSessions: 1, freeTypes: ["normal"], discount: 0.1, daysAhead: 10, sameDay: false, pdfReport: true },
-  pro: { freeSessions: 2, freeTypes: null, discount: 0.2, daysAhead: 30, sameDay: true, pdfReport: true },
+  ai: { freeSessions: 0, freeTypes: [], discount: 0, daysAhead: 10, sameDay: false, pdfReport: false, fullSimulator: false },
+  standard: { freeSessions: 1, freeTypes: ["normal"], discount: 0.1, daysAhead: 10, sameDay: false, pdfReport: true, fullSimulator: true },
+  pro: { freeSessions: 2, freeTypes: null, discount: 0.2, daysAhead: 30, sameDay: true, pdfReport: true, fullSimulator: true },
 };
 const perksFor = (tier) => PLAN_PERKS[tier] ?? PLAN_PERKS.ai;
 
@@ -1100,7 +1100,7 @@ const DIAGNOSIS = {
   OPTIMAL: "Your fundamentals are strong across savings, buffer, and debt load. Focus now shifts to optimizing growth toward your FIRE target.",
 };
 
-function DashboardPage({ profile, metrics, fireData, T }) {
+function DashboardPage({ profile, metrics, fireData, subscriptionTier, setPage, T }) {
   const { t, fmt, lang, money } = useLang();
   const pieData = [
     { name: t("Essentials"), value: profile.essentialExpenses, color: "#dc2626" },
@@ -1180,7 +1180,10 @@ function DashboardPage({ profile, metrics, fireData, T }) {
         </div>
       </div>
 
-      <WhatIfSimulator profile={profile} metrics={metrics} fireData={fireData} simulate={simulateProfile} T={T} />
+      <WhatIfSimulator
+        profile={profile} metrics={metrics} fireData={fireData} simulate={simulateProfile}
+        fullAccess={perksFor(subscriptionTier).fullSimulator} onUpgrade={() => setPage("subscription")} T={T}
+      />
 
       <div className={cn("rounded-2xl border p-5", T.panel, T.cardBorder)}>
         <h3 className={cn("mb-3 font-display text-sm font-semibold", T.text)}>{t("Glossary")}</h3>
@@ -2158,7 +2161,7 @@ export default function App() {
 
       {AUTHED_PAGES.includes(page) && (
         <AppShell page={page} setPage={setPage} onLogout={handleLogout} T={T} healthStatus={metrics.healthStatus} userName={profile.fullName || user.fullName} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
-          {page === "dashboard" && <DashboardPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
+          {page === "dashboard" && <DashboardPage profile={profile} metrics={metrics} fireData={fireData} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
           {page === "experts" && <ExpertsPage subscriptionTier={subscription.tier} bookings={bookings} setBookings={setBookings} showToast={showToast} setPage={setPage} T={T} />}
           {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} T={T} />}
           {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
