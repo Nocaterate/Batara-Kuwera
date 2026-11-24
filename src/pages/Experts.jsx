@@ -80,7 +80,8 @@ export function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast
       !refunded ? "Session cancelled. It was within {h} hours of the start, so it isn't refunded."
         : booking.usedCredit ? "Session cancelled. Your free monthly session has been returned."
           : "Session cancelled. {amount} will be refunded to your original payment method.",
-      { amount: money(booking.amount), h: perks.refundHours }
+      { amount: money(booking.amount), h: perks.refundHours },
+      refunded ? "info" : "warning"
     );
   };
 
@@ -88,7 +89,7 @@ export function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast
     const startsAt = new Date(day);
     startsAt.setHours(hour, 0, 0, 0);
     // The modal may have sat open past the slot's start time.
-    if (startsAt.getTime() <= Date.now()) { showToast("That time has already passed. Please pick another slot."); return; }
+    if (startsAt.getTime() <= Date.now()) { showToast("That time has already passed. Please pick another slot.", undefined, "warning"); return; }
     const q = quote(expert, type);
     setScheduling(null);
     const order = {
@@ -112,7 +113,8 @@ export function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast
       usedCredit
         ? "Booked with your free monthly session: {name}, {when} at {time}. They'll confirm within 24 hours."
         : "Session booked with {name} for {when} at {time}. They'll confirm within 24 hours.",
-      { name: order.expertName, when, time: `${String(d.getHours()).padStart(2, "0")}:00` }
+      { name: order.expertName, when, time: `${String(d.getHours()).padStart(2, "0")}:00` },
+      "success"
     );
   };
 

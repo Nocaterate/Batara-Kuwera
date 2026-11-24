@@ -82,8 +82,9 @@ export default function App() {
   // Stable across renders, and the hide timer lives in a ref, so a new toast always cancels the
   // previous one's timer and stays up for its full 3.2 s.
   const toastTimer = useRef(null);
-  const showToast = useCallback((key, vars) => {
-    setToast({ key, vars });
+  // tone: "success" (green check), "warning" (amber triangle) or "info" (neutral, the default).
+  const showToast = useCallback((key, vars, tone = "info") => {
+    setToast({ key, vars, tone, id: Date.now() });
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 3200);
   }, []);
@@ -115,7 +116,7 @@ export default function App() {
       if (Date.now() < subscription.expiresAt) return;
       const plan = TIERS.find((x) => x.id === subscription.tier)?.name ?? "";
       setSubscription(FREE_SUBSCRIPTION);
-      showToast("Your {plan} plan has expired. You're back on the Free plan.", { plan });
+      showToast("Your {plan} plan has expired. You're back on the Free plan.", { plan }, "warning");
     };
     check();
     const id = window.setInterval(check, 30000);
@@ -129,7 +130,7 @@ export default function App() {
       setSession(null);
       resetAccountState();
       setPage("login");
-      showToast("Your session has expired. Please sign in again.");
+      showToast("Your session has expired. Please sign in again.", undefined, "warning");
     };
     const remaining = session.expiresAt - Date.now();
     if (remaining <= 0) { expire(); return undefined; }
@@ -189,7 +190,7 @@ export default function App() {
 
     // No auto sign-in: the new user logs in manually, then lands in onboarding.
     setPage("login");
-    showToast("Account created. Please sign in to continue.");
+    showToast("Account created. Please sign in to continue.", undefined, "success");
     return null;
   };
 
@@ -197,7 +198,7 @@ export default function App() {
     setHasProfile(true);
     setUser((u) => ({ ...u, fullName: profile.fullName || u.fullName }));
     setPage("dashboard");
-    showToast("Profile saved — your dashboard is ready.");
+    showToast("Profile saved — your dashboard is ready.", undefined, "success");
   };
 
   const handleLogout = () => {
@@ -240,6 +241,8 @@ export default function App() {
       {AUTHED_PAGES.includes(page) && (
         <AppShell page={page} setPage={(p) => { setExpertsTab("find"); setPage(p); }} onLogout={handleLogout} T={T} healthStatus={metrics.healthStatus} userName={profile.fullName || user.fullName} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
           <Suspense fallback={<PageLoading />}>
+          {/* Keyed by page, so each page switch replays a short fade-in (.bk-page-in in index.css). */}
+          <div key={page} className="bk-page-in h-full">
           {page === "dashboard" && <DashboardPage
             profile={profile} metrics={metrics} fireData={fireData} subscriptionTier={subscription.tier} bookings={bookings} goals={goals}
             openMySessions={() => { setExpertsTab("mine"); setPage("experts"); }} setPage={setPage} T={T}
@@ -254,6 +257,7 @@ export default function App() {
           {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} showToast={showToast} T={T} />}
           {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
           {page === "chat" && <ChatPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
+          </div>
           </Suspense>
         </AppShell>
       )}

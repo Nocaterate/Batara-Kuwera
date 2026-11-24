@@ -69,7 +69,8 @@ export function SubscriptionPage({ subscription, setSubscription, setPage, showT
     setDowngrading(null);
     showToast(
       d.refund > 0 ? "Switched to {plan}. {amount} will be refunded to your original payment method." : "Switched to {plan}.",
-      { plan: t(d.toName), amount: money(d.refund) }
+      { plan: t(d.toName), amount: money(d.refund) },
+      "success"
     );
   };
 

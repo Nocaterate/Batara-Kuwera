@@ -25,7 +25,7 @@ export function SettingsPage({ theme, setTheme, setLang, user, setUser, profile,
   const saveFinances = () => {
     setProfile(draft);
     setEditingFinances(false);
-    showToast("Financial info updated — your dashboard has been recalculated.");
+    showToast("Financial info updated — your dashboard has been recalculated.", undefined, "success");
   };
 
   const canExport = perksFor(subscriptionTier).pdfReport;
@@ -40,9 +40,9 @@ export function SettingsPage({ theme, setTheme, setLang, user, setUser, profile,
       // jsPDF is large and only needed here, so it loads on first click instead of with the app.
       const { generateFinancialReportPdf } = await import("../pdfReport.js");
       await generateFinancialReportPdf({ user, profile, metrics, fireData, lang, t, fmt, formatCurrency: money, logoSrc: LOGO_SRC });
-      showToast("Your financial report has started downloading.");
+      showToast("Your financial report has started downloading.", undefined, "success");
     } catch {
-      showToast("Export failed — please try again.");
+      showToast("Export failed — please try again.", undefined, "warning");
     }
   };
 

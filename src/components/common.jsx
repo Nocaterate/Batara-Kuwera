@@ -1,8 +1,9 @@
 // Small shared pieces: stat card, toast and health badge.
-import { ShieldCheck, ShieldAlert, ShieldQuestion, Info } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ShieldQuestion, Info, CircleCheck, TriangleAlert } from "lucide-react";
 import { useLang } from "../i18n.js";
 import { cn } from "../ui.js";
 import SoftWrap from "../SoftWrap.jsx";
+import { useEffect, useState } from "react";
 import { InfoTip } from "./fields.jsx";
 import useCountUp from "../useCountUp.js";
 
@@ -31,13 +32,43 @@ export function StatCard({ icon: Icon, label, info, value, countTo, format, sub,
   );
 }
 
+// Slides up and fades in; when `toast` goes back to null it stays on screen a moment longer to fade out.
+// A new toast (new id) replaces the current one and plays the entrance again.
+const TOAST_EXIT_MS = 180;
+const TOAST_TONES = {
+  success: { icon: CircleCheck, iconClass: "text-emerald-400", border: "border-emerald-900/60" },
+  warning: { icon: TriangleAlert, iconClass: "text-amber-400", border: "border-amber-900/60" },
+  info: { icon: Info, iconClass: "text-zinc-400", border: "border-zinc-700" },
+};
+
 export function Toast({ toast }) {
   const { t } = useLang();
-  if (!toast) return null;
+  const [shown, setShown] = useState(toast);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    if (toast) { setShown(toast); setLeaving(false); return undefined; }
+    if (!shown) return undefined;
+    setLeaving(true);
+    const id = window.setTimeout(() => { setShown(null); setLeaving(false); }, TOAST_EXIT_MS);
+    return () => window.clearTimeout(id);
+  }, [toast, shown]);
+
+  if (!shown) return null;
+  const tone = TOAST_TONES[shown.tone] ?? TOAST_TONES.info;
+  const Icon = tone.icon;
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex max-w-xs items-start gap-2 rounded-lg border border-red-900/50 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 shadow-2xl shadow-black/40">
-      <Info size={16} className="mt-0.5 shrink-0 text-red-500" />
-      <span>{t(toast.key, toast.vars)}</span>
+    <div
+      key={shown.id}
+      role="status"
+      aria-live="polite"
+      className={cn(
+        "fixed bottom-5 right-5 z-50 flex max-w-xs items-start gap-2 rounded-lg border bg-zinc-900 px-4 py-3 text-sm text-zinc-100 shadow-2xl shadow-black/40",
+        tone.border, leaving ? "bk-toast-out" : "bk-toast-in"
+      )}
+    >
+      <Icon size={16} className={cn("mt-0.5 shrink-0", tone.iconClass)} />
+      <span>{t(shown.key, shown.vars)}</span>
     </div>
   );
 }

@@ -172,13 +172,13 @@ export default function GoalsPage({ goals, setGoals, maxGoals, monthlySurplus, s
   const create = (data) => {
     setGoals((list) => [...list, { id: newId(), ...data, deposits: [], createdAt: Date.now() }]);
     setEditing(null);
-    showToast("Goal created: {name}", { name: data.name });
+    showToast("Goal created: {name}", { name: data.name }, "success");
   };
   const deposit = (goal, amount) => {
     const reached = goalSaved(goal) < goal.target && goalSaved(goal) + amount >= goal.target;
     update(goal.id, (g) => ({ ...g, deposits: [...g.deposits, { amount, at: Date.now() }] }));
     if (reached) {
-      showToast("You reached your goal: {name}!", { name: goal.name });
+      showToast("You reached your goal: {name}!", { name: goal.name }, "success");
       const key = Date.now();
       setCelebration(key);
       window.setTimeout(() => setCelebration((c) => (c === key ? null : c)), 4000);

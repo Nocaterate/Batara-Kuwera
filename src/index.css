@@ -20,6 +20,19 @@
   background-position: center top;
 }
 
+/* Toasts (src/components/common.jsx): slide up and fade in, fade out on close. */
+@keyframes bk-toast-in { from { opacity: 0; transform: translateY(12px) scale(.98) } to { opacity: 1; transform: none } }
+@keyframes bk-toast-out { to { opacity: 0; transform: translateY(6px) } }
+.bk-toast-in { animation: bk-toast-in .22s cubic-bezier(.2,.8,.2,1) both }
+.bk-toast-out { animation: bk-toast-out .18s ease-in forwards }
+
+/* Page switches fade in (src/App.jsx); new chat messages fade and rise in (src/pages/Chat.jsx).
+   Fill mode is `backwards`, not `both`: once finished they leave no transform behind, which would
+   otherwise make position: fixed children (info tooltips, goal confetti) position against the page. */
+@keyframes bk-rise-in { from { opacity: 0; transform: translateY(var(--rise, 4px)) } to { opacity: 1; transform: none } }
+.bk-page-in { animation: bk-rise-in .15s ease-out backwards }
+.bk-msg-in { --rise: 8px; animation: bk-rise-in .22s cubic-bezier(.2,.8,.2,1) backwards }
+
 /* Loading placeholders: a soft highlight sweeping across grey blocks. */
 @keyframes bk-shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
 .bk-skeleton {
@@ -29,5 +42,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bk-anim, .bk-skeleton { animation: none !important }
+  .bk-anim, .bk-skeleton, .bk-toast-in, .bk-toast-out, .bk-page-in, .bk-msg-in { animation: none !important }
 }

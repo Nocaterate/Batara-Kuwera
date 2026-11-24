@@ -160,6 +160,7 @@ export default function WhatIfSimulator({ profile, metrics, fireData, simulate, 
       </div>
 
       {fullAccess && (<>
+      {/* No chart animation here: it would replay on every slider move and lag behind the values. */}
       <div className="mt-5 h-56">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData}>
@@ -174,9 +175,9 @@ export default function WhatIfSimulator({ profile, metrics, fireData, simulate, 
             <YAxis tick={{ fontSize: 10, fill: "#71717a" }} tickFormatter={(v) => compactShort(v, lang)} width={46} />
             <Tooltip formatter={(v) => money(v)} labelFormatter={(a) => `${t("Age")} ${a}`} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "#e4e4e7" }} itemStyle={{ color: "#f4f4f5" }} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Line type="monotone" dataKey="current" name={t("Current path")} stroke="#71717a" dot={false} strokeWidth={1.5} />
-            <Area type="monotone" dataKey="whatIf" name={t("What-if path")} stroke="#dc2626" fill="url(#whatif)" strokeWidth={2} />
-            <Line type="monotone" dataKey="target" name={t("FIRE target")} stroke="#a1a1aa" strokeDasharray="5 5" dot={false} strokeWidth={1} />
+            <Line type="monotone" dataKey="current" name={t("Current path")} stroke="#71717a" dot={false} strokeWidth={1.5} isAnimationActive={false} />
+            <Area type="monotone" dataKey="whatIf" name={t("What-if path")} stroke="#dc2626" fill="url(#whatif)" strokeWidth={2} isAnimationActive={false} />
+            <Line type="monotone" dataKey="target" name={t("FIRE target")} stroke="#a1a1aa" strokeDasharray="5 5" dot={false} strokeWidth={1} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

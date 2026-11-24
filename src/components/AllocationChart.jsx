@@ -92,7 +92,9 @@ export function AllocationChart({ data, savingsRate, T }) {
           </span>
         </div>
       </div>
-      <ul className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1">
+      {/* Two columns where the card is wide (phones in landscape and up, very wide screens); one column on
+          laptop widths, where the card shares its row with the trajectory chart and names would be cut off. */}
+      <ul className="mt-3 grid grid-cols-1 gap-x-2 gap-y-1 min-[420px]:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
         {data.map((d, i) => (
           <li
             key={d.name}

@@ -55,7 +55,7 @@ export function ChatPage({ profile, metrics, fireData, T }) {
           </div>
         </div>
         {messages.map((m, i) => (
-          <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+          <div key={i} className={cn("bk-msg-in flex", m.role === "user" ? "justify-end" : "justify-start")}>
             <div
               style={{ maxWidth: "85%" }}
               className={cn(
@@ -68,7 +68,7 @@ export function ChatPage({ profile, metrics, fireData, T }) {
           </div>
         ))}
         {loading && (
-          <div className="flex justify-start">
+          <div className="bk-msg-in flex justify-start">
             <div className={cn("flex items-center gap-1.5 rounded-2xl border px-3.5 py-2.5 text-sm", T.border, T.mutedText)}>
               <Sparkles size={13} className="animate-pulse" /> {t("thinking…")}
             </div>
