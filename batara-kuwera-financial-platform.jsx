@@ -599,6 +599,18 @@ function AllocationTooltip({ active, payload, total }) {
   );
 }
 
+// Recharts 3 removed Pie's activeIndex, so each slice is drawn through `shape`, which receives the
+// slice's index: the one we mark active (hovered slice or legend row) is drawn larger with a glow.
+const renderSlice = (active) => function PieSlice(p) {
+  if (p.index === active) return renderActiveSlice(p);
+  return (
+    <Sector
+      cx={p.cx} cy={p.cy} innerRadius={p.innerRadius} outerRadius={p.outerRadius}
+      startAngle={p.startAngle} endAngle={p.endAngle} cornerRadius={p.cornerRadius} fill={p.fill} stroke="none"
+    />
+  );
+};
+
 const renderActiveSlice = (p) => (
   <g style={{ filter: `drop-shadow(0 0 8px ${p.payload?.color ?? "#ffffff"}aa)` }}>
     <Sector
@@ -634,7 +646,7 @@ function AllocationChart({ data, savingsRate, T }) {
               data={data} dataKey="value" nameKey="name"
               innerRadius={62} outerRadius={84} paddingAngle={4} cornerRadius={8}
               startAngle={90} endAngle={-270} stroke="none"
-              activeIndex={active ?? -1} activeShape={renderActiveSlice}
+              shape={renderSlice(active)}
               onMouseEnter={(_, i) => setActive(i)} onMouseLeave={() => setActive(null)}
               animationDuration={900}
             >
