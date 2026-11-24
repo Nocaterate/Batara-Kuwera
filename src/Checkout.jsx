@@ -98,7 +98,12 @@ function Summary({ order, formatMoney }) {
 
         <div className="space-y-2 border-y border-white/10 py-4">
           {session ? (
-            <Row label={`${t(order.typeLabel)} · ${order.duration} ${t("min")}`} value={formatMoney(order.fullPrice)} />
+            <>
+              <Row label={`${t(order.typeLabel)} · ${order.duration} ${t("min")}`} value={formatMoney(order.fullPrice)} />
+              {order.amount < order.fullPrice && (
+                <Row label={t("{plan} discount ({pct}%)", { plan: order.planName, pct: Math.round(order.discount * 100) })} value={"−" + formatMoney(order.fullPrice - order.amount)} accent />
+              )}
+            </>
           ) : (
             <>
               <Row label={`${order.tierName} · ${t(order.cycle)}`} value={formatMoney(order.fullPrice)} />

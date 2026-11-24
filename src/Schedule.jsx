@@ -7,7 +7,6 @@ import Modal from "./Modal.jsx";
 import Avatar from "./Avatar.jsx";
 import { cn } from "./ui.js";
 
-const DAY_COUNT = 10;
 const START_HOUR = 9;   // 09:00
 const END_HOUR = 20;    // last start time; a 60-min session then ends by 21:00
 const DURATION_MIN = 60;
@@ -91,8 +90,27 @@ function ExpertHeader({ expert, T }) {
   );
 }
 
-function TypeStep({ expert, onPick, T }) {
+// Price shown for a type: free (plan credit), discounted (original struck through) or full.
+function PriceTag({ q, T }) {
   const { t, money } = useLang();
+  if (q.free) {
+    return (
+      <span className="shrink-0 text-right">
+        <span className={cn("block font-data text-[11px] line-through", T.mutedText)}>{money(q.full)}</span>
+        <span className={cn("block whitespace-nowrap text-sm font-semibold", T.good)}>{t("Free")}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="shrink-0 text-right">
+      {q.price < q.full && <span className={cn("block font-data text-[11px] line-through", T.mutedText)}>{money(q.full)}</span>}
+      <span className={cn("block whitespace-nowrap font-data text-sm font-semibold", T.text)}>{money(q.price)}</span>
+    </span>
+  );
+}
+
+function TypeStep({ expert, quote, perksNote, onPick, T }) {
+  const { t } = useLang();
   const types = useMemo(() => typesForExpert(expert), [expert]);
 
   return (
@@ -119,21 +137,25 @@ function TypeStep({ expert, onPick, T }) {
               <span className={cn("block text-sm font-semibold", T.text)}>{t(type.label)}</span>
               <span className={cn("mt-0.5 block text-xs", T.subtext)}>{t(type.desc)}</span>
             </span>
-            <span className={cn("shrink-0 whitespace-nowrap font-data text-sm font-semibold", T.text)}>{money(sessionPrice(expert, type))}</span>
+            <PriceTag q={quote(expert, type)} T={T} />
           </button>
         ))}
       </div>
 
-      <p className={cn("mt-4 text-xs", T.mutedText)}>{t("Sessions are paid per booking, on any plan.")}</p>
+      {perksNote && <p className={cn("mt-4 text-xs", T.mutedText)}>{perksNote}</p>}
     </div>
   );
 }
 
 // busySlots: start timestamps of the viewer's own paid sessions (with any expert), so they
 // can't book the same slot twice or be in two sessions at once.
-function DateTimeStep({ expert, type, initialDay, initialHour, busySlots, onBack, onPick, T }) {
+// daysAhead / sameDay come from the viewer's plan (Expert Pro books further ahead and same-day).
+function DateTimeStep({ expert, type, initialDay, initialHour, busySlots, daysAhead, sameDay, onBack, onPick, T }) {
   const { t, lang } = useLang();
-  const days = useMemo(() => Array.from({ length: DAY_COUNT }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i); d.setHours(0, 0, 0, 0); return d; }), []);
+  const days = useMemo(
+    () => Array.from({ length: daysAhead }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i + (sameDay ? 0 : 1)); d.setHours(0, 0, 0, 0); return d; }),
+    [daysAhead, sameDay]
+  );
   const hours = useMemo(() => Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i), []);
   // A slot that has already started today can't be booked.
   const isPast = (day, h) => slotStart(day, h) <= Date.now();
@@ -174,6 +196,8 @@ function DateTimeStep({ expert, type, initialDay, initialHour, busySlots, onBack
           );
         })}
       </div>
+
+      {!sameDay && <p className={cn("text-xs", T.mutedText)}>{t("Same-day booking is available on Expert Pro.")}</p>}
 
       <div className={cn("mb-1.5 mt-4 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider", T.subtext)}>
         <Clock size={13} /> {t("Time")}
@@ -216,9 +240,9 @@ function DateTimeStep({ expert, type, initialDay, initialHour, busySlots, onBack
   );
 }
 
-function ConfirmStep({ expert, type, day, hour, notes, setNotes, onBack, onConfirm, T }) {
+function ConfirmStep({ expert, type, quote, day, hour, notes, setNotes, onBack, onConfirm, T }) {
   const { t, lang, money } = useLang();
-  const price = sessionPrice(expert, type);
+  const q = quote(expert, type);
   return (
     <div>
       <button type="button" onClick={onBack} className={cn("mb-3 inline-flex items-center gap-1 text-xs hover:text-red-500", T.subtext)}>
@@ -232,7 +256,7 @@ function ConfirmStep({ expert, type, day, hour, notes, setNotes, onBack, onConfi
           [type.icon, t(type.label)],
           [Calendar, fmtFullDate(day, lang)],
           [Clock, `${hourLabel(hour)} · ${DURATION_MIN} ${t("min")}`],
-          [CreditCard, money(price)],
+          [CreditCard, q.free ? t("Free (monthly plan session)") : money(q.price)],
         ].map(([Icon, label], i) => (
           <div key={i} className="flex items-center gap-3 text-sm">
             <Icon size={16} className={T.accent} />
@@ -257,7 +281,9 @@ function ConfirmStep({ expert, type, day, hour, notes, setNotes, onBack, onConfi
         onClick={onConfirm}
         className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-red-600 to-red-500 py-3.5 text-sm font-semibold text-white shadow-lg shadow-red-600/30 transition-all hover:-translate-y-0.5"
       >
-        <CreditCard size={16} /> {t("Continue to payment · {amount}", { amount: money(price) })}
+        {q.free
+          ? <><Check size={16} /> {t("Book with free session")}</>
+          : <><CreditCard size={16} /> {t("Continue to payment · {amount}", { amount: money(q.price) })}</>}
       </button>
     </div>
   );
@@ -265,7 +291,8 @@ function ConfirmStep({ expert, type, day, hour, notes, setNotes, onBack, onConfi
 
 // Picks type, date and time, then hands the booking to the parent, which takes payment
 // (src/Checkout.jsx) before the session counts as booked.
-export default function ScheduleModal({ expert, busySlots, onClose, onCheckout, T }) {
+// quote(expert, type) -> { full, price, free }: the viewer's price after plan credits and discounts.
+export default function ScheduleModal({ expert, busySlots, quote, perksNote, daysAhead, sameDay, onClose, onCheckout, T }) {
   const { t } = useLang();
   const [step, setStep] = useState("type");
   const [type, setType] = useState(null);
@@ -277,17 +304,18 @@ export default function ScheduleModal({ expert, busySlots, onClose, onCheckout, 
     <Modal onClose={onClose} label={t("Book a session")} className="max-w-md" T={T}>
       <div className="relative overflow-y-auto p-6 sm:p-8">
         <Stepper current={step === "type" ? 0 : step === "datetime" ? 1 : 2} T={T} />
-        {step === "type" && <TypeStep expert={expert} onPick={(t) => { setType(t); setStep("datetime"); }} T={T} />}
+        {step === "type" && <TypeStep expert={expert} quote={quote} perksNote={perksNote} onPick={(t) => { setType(t); setStep("datetime"); }} T={T} />}
         {step === "datetime" && (
           <DateTimeStep
-            expert={expert} type={type} initialDay={day} initialHour={hour} busySlots={busySlots} onBack={() => setStep("type")}
+            expert={expert} type={type} initialDay={day} initialHour={hour} busySlots={busySlots}
+            daysAhead={daysAhead} sameDay={sameDay} onBack={() => setStep("type")}
             onPick={(d, h) => { setDay(d); setHour(h); setStep("confirm"); }}
             T={T}
           />
         )}
         {step === "confirm" && (
           <ConfirmStep
-            expert={expert} type={type} day={day} hour={hour} notes={notes} setNotes={setNotes}
+            expert={expert} type={type} quote={quote} day={day} hour={hour} notes={notes} setNotes={setNotes}
             onBack={() => setStep("datetime")} onConfirm={() => onCheckout({ type, day, hour, notes })} T={T}
           />
         )}
