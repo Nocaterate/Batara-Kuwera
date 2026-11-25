@@ -64,7 +64,8 @@ export function AppShell({ page, setPage, onLogout, T, healthStatus, userName, s
         </div>
       </aside>
 
-      <div className="flex min-h-screen flex-1 flex-col">
+      {/* min-w-0: as a flex item this column would otherwise grow to its widest content and make phones scroll sideways. */}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <header className={cn("flex items-center gap-3 border-b px-4 py-3 md:hidden", T.border, T.panel)}>
           <button onClick={() => setSidebarOpen(true)} className={T.text}><Menu size={20} /></button>
           <img src={LOGO_SRC} alt="Batara Kuwera" className="h-6 w-6 rounded-md object-cover" />

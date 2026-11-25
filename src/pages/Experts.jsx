@@ -60,7 +60,9 @@ export function ExpertsPage({ subscriptionTier, bookings, setBookings, showToast
     : creditsLeft > 0
       ? (perks.freeTypes
         ? t("{plan}: {n} free Normal Consultation left this month, then {pct}% off every session.", { plan: plan.name, n: creditsLeft, pct })
-        : t("{plan}: {n} free session(s) of any type left this month, then {pct}% off every session.", { plan: plan.name, n: creditsLeft, pct }))
+        : t(creditsLeft === 1
+          ? "{plan}: 1 free session of any type left this month, then {pct}% off every session."
+          : "{plan}: {n} free sessions of any type left this month, then {pct}% off every session.", { plan: plan.name, n: creditsLeft, pct }))
       : t("{plan}: {pct}% off every session. Your free sessions renew next month.", { plan: plan.name, pct });
 
   // Start times of the viewer's upcoming sessions, so the scheduler can block them.

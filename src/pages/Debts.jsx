@@ -222,11 +222,11 @@ export function DebtsPage({ debts, setDebts, monthlySurplus, fullAccess, setPage
               <li key={d.id}><DebtForm initial={d} onSave={save} onCancel={() => setEditing(null)} T={T} /></li>
             ) : (
               <li key={d.id} className={cn("flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border px-4 py-3", T.panel, T.cardBorder)}>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
                   <div className={cn("truncate text-sm font-semibold", T.text)}>{d.name}</div>
                   <div className={cn("font-data text-xs", T.mutedText)}>{d.rate}% {t("/ year")} · {t("min.")} {money(d.minPayment)}{t("/mo")}</div>
                 </div>
-                <div className={cn("font-data text-sm font-semibold", T.text)}>{money(d.balance)}</div>
+                <div className={cn("flex-1 font-data text-sm font-semibold sm:flex-none", T.text)}>{money(d.balance)}</div>
                 <div className="flex gap-1">
                   <button type="button" onClick={() => setEditing(d.id)} aria-label={t("Edit debt")} className={cn("rounded-md p-1.5", T.subtext, T.hoverBg)}><Pencil size={14} /></button>
                   <button

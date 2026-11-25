@@ -79,12 +79,13 @@ function Stepper({ current, T }) {
 }
 
 function ExpertHeader({ expert, T }) {
+  const { t } = useLang();
   return (
     <div className="mb-5 flex items-center gap-3">
       <Avatar name={expert.name} photo={expert.photo} size={44} T={T} />
       <div className="min-w-0">
         <div className={cn("truncate text-sm font-semibold", T.text)}>{expert.name}</div>
-        <div className={cn("font-data text-xs", T.subtext)}>{expert.cert} · {expert.years}</div>
+        <div className={cn("font-data text-xs", T.subtext)}>{expert.cert} · {expert.years} {t("yrs")}</div>
       </div>
     </div>
   );
