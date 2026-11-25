@@ -267,7 +267,12 @@ export default function App() {
           {page === "experts" && <ExpertsPage key={expertsTab} initialTab={expertsTab} subscriptionTier={subscription.tier} bookings={bookings} setBookings={setBookings} showToast={showToast} setPage={setPage} T={T} />}
           {page === "subscription" && <SubscriptionPage subscription={subscription} setSubscription={setSubscription} setPage={setPage} showToast={showToast} T={T} />}
           {page === "settings" && <SettingsPage theme={theme} setTheme={setTheme} setLang={setLang} user={user} setUser={setUser} profile={profile} setProfile={setProfile} metrics={metrics} fireData={fireData} onDeleteAccount={handleDeleteAccount} showToast={showToast} subscriptionTier={subscription.tier} setPage={setPage} T={T} />}
-          {page === "chat" && <ChatPage profile={profile} metrics={metrics} fireData={fireData} T={T} />}
+          {page === "chat" && (
+            <ChatPage
+              profile={profile} metrics={metrics} fireData={fireData} goals={goals} debts={debts} bookings={bookings}
+              fullDebtPlan={perksFor(subscription.tier).fullDebtPlan} T={T}
+            />
+          )}
           </div>
           </Suspense>
         </AppShell>

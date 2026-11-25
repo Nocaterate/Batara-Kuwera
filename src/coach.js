@@ -1,18 +1,26 @@
 /* Smart Coach: a rule-based coach that answers from the user's own numbers.
  * No AI service, no network: it matches the question to a topic, then explains the
  * relevant metric using the same thresholds as the dashboard's health assessment
- * (see computeMetrics). Every reply exists in English and Bahasa Indonesia. */
+ * (see computeMetrics). It also reads the user's savings goals, debts and booked sessions.
+ * Every reply exists in English and Bahasa Indonesia. */
+
+import { goalSaved, goalPlan } from "./goals.js";
+import { simulate, stuckDebts, totalMinimums } from "./debt.js";
 
 // Dashboard thresholds (keep in step with computeMetrics' healthStatus).
 const SAVINGS_MIN = 10, SAVINGS_GOOD = 20, SAVINGS_OPTIMAL = 30;
 const EMERGENCY_MIN = 3, EMERGENCY_GOOD = 6;
 const DTI_OK = 20, DTI_MAX = 40;
+const SESSION_MS = 60 * 60 * 1000; // expert sessions run 60 minutes (SESSION_MINUTES in Schedule.jsx)
 
 // Topic -> keywords (English and Indonesian). Checked in this order, so the more specific topics come first.
 const TOPICS = [
   ["thanks", ["thank", "thx", "makasih", "terima kasih", "trims"]],
+  ["sessions", ["session", "appointment", "booking", "booked", "sesi", "jadwal", "janji temu"]],
   ["expert", ["expert", "advisor", "adviser", "consult", "planner", "konsultasi", "konsultan", "penasihat"]],
   ["emergency", ["emergency", "rainy day", "darurat"]],
+  ["goals", ["goal", "goals", "saving for", "saving up for", "tujuan", "menabung untuk", "nabung untuk"]],
+  ["debtplan", ["debt free", "pay off", "payoff", "pay down", "avalanche", "snowball", "bebas utang", "bebas hutang", "lunas"]],
   ["debt", ["dti", "debt", "loan", "credit card", "repay", "mortgage", "utang", "hutang", "cicilan", "pinjaman", "kartu kredit", "kpr"]],
   ["fire", ["fire", "freedom", "retire", "financial independence", "pensiun", "kebebasan finansial", "bebas finansial"]],
   ["invest", ["invest", "stock", "crypto", "bitcoin", "mutual fund", "bond", "saham", "kripto", "investasi", "reksa dana", "obligasi", "emas", "gold"]],
@@ -34,6 +42,14 @@ export function detectTopic(text) {
 }
 
 const pct = (v, fmt) => `${fmt(v, 1)}%`;
+const locale = (lang) => (lang === "id" ? "id-ID" : "en-US");
+const dayLabel = (ts, lang) => new Date(ts).toLocaleDateString(locale(lang), { day: "numeric", month: "short", year: "numeric" });
+const monthsFromNow = (months, lang) => {
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.toLocaleDateString(locale(lang), { month: "long", year: "numeric" });
+};
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /* Each topic returns { en, id } text. `c` holds the numbers and formatters. */
 const REPLIES = {
@@ -113,9 +129,153 @@ const REPLIES = {
     const shortTip = st > 0
       ? { en: ` Pay off your short-term debt (${money(st)}) first: credit cards and pay-later loans usually charge the highest interest.`, id: ` Lunasi utang jangka pendek (${money(st)}) lebih dulu: kartu kredit dan paylater biasanya bunganya paling tinggi.` }
       : { en: ` Your remaining debt is long-term (${money(lt)}); extra payments there help, but they shouldn't come at the cost of your emergency fund.`, id: ` Sisa utangmu jangka panjang (${money(lt)}); pembayaran ekstra membantu, tapi jangan sampai mengorbankan dana darurat.` };
+    const plan = c.debts.length
+      ? { en: `\n\nAsk me "when will I be debt-free?" for the payoff date of the debts on your Debt plan page.`, id: `\n\nTanyakan "kapan aku bebas utang?" untuk melihat tanggal lunas utang di halaman Rencana utang.` }
+      : { en: "", id: "" };
     return {
-      en: `Your debt-to-income ratio (DTI) is ${pct(m.dti, fmt)}: ${money(repay)} of your ${money(m.monthlyIncome)} monthly income goes to debt repayments. ${verdict.en}${shortTip.en}`,
-      id: `Rasio utang terhadap pendapatan (DTI) kamu ${pct(m.dti, fmt)}: ${money(repay)} dari pendapatan bulanan ${money(m.monthlyIncome)} dipakai untuk cicilan. ${verdict.id}${shortTip.id}`,
+      en: `Your debt-to-income ratio (DTI) is ${pct(m.dti, fmt)}: ${money(repay)} of your ${money(m.monthlyIncome)} monthly income goes to debt repayments. ${verdict.en}${shortTip.en}${plan.en}`,
+      id: `Rasio utang terhadap pendapatan (DTI) kamu ${pct(m.dti, fmt)}: ${money(repay)} dari pendapatan bulanan ${money(m.monthlyIncome)} dipakai untuk cicilan. ${verdict.id}${shortTip.id}${plan.id}`,
+    };
+  },
+
+  // Savings goals from the Goals page.
+  goals(c) {
+    const { goals, money, lang, m } = c;
+    if (!goals.length) {
+      return {
+        en: `You don't have any savings goals yet. Add one on the Goals page (a laptop, a holiday, a wedding fund) with a target date, and I'll tell you how much to put aside each month to get there on time.`,
+        id: `Kamu belum punya tujuan tabungan. Tambahkan di halaman Tujuan (laptop, liburan, dana pernikahan) beserta tanggal targetnya, lalu aku akan menghitung berapa yang perlu disisihkan setiap bulan supaya tercapai tepat waktu.`,
+      };
+    }
+    const now = Date.now();
+    const rows = goals.map((g) => {
+      const saved = goalSaved(g);
+      return { g, saved, left: Math.max(0, g.target - saved), done: Math.min(100, Math.floor((saved / g.target) * 100)), plan: goalPlan(g, now) };
+    });
+    // Unfinished goals first, the closest deadline first.
+    rows.sort((a, b) => (a.plan.state === "done") - (b.plan.state === "done") || (a.g.targetDate ?? Infinity) - (b.g.targetDate ?? Infinity));
+    const line = ({ g, saved, left, done, plan }) => {
+      const head = `• ${g.name}: `;
+      if (plan.state === "done") return { en: `${head}reached, ${money(saved)} saved. Well done!`, id: `${head}tercapai, ${money(saved)} terkumpul. Mantap!` };
+      const progress = { en: `${done}% saved (${money(saved)} of ${money(g.target)})`, id: `${done}% terkumpul (${money(saved)} dari ${money(g.target)})` };
+      if (plan.state === "onTime") return { en: `${head}${progress.en}. Put aside ${money(plan.perMonth)} a month to finish by ${dayLabel(g.targetDate, lang)}.`, id: `${head}${progress.id}. Sisihkan ${money(plan.perMonth)} per bulan agar selesai pada ${dayLabel(g.targetDate, lang)}.` };
+      if (plan.state === "late") return { en: `${head}${progress.en}. The target date has passed with ${money(left)} to go, so pick a new date.`, id: `${head}${progress.id}. Tanggal targetnya sudah lewat dan masih kurang ${money(left)}, jadi pilih tanggal baru.` };
+      return { en: `${head}${progress.en}. Add a target date and I can work out a monthly amount.`, id: `${head}${progress.id}. Tambahkan tanggal target supaya aku bisa menghitung jumlah bulanannya.` };
+    };
+    const shown = rows.slice(0, 3).map(line);
+    const more = rows.length > 3 ? { en: `\n…and ${rows.length - 3} more on the Goals page.`, id: `\n…dan ${rows.length - 3} lainnya di halaman Tujuan.` } : { en: "", id: "" };
+
+    // Compare what the dated goals need each month with what's left over after expenses.
+    const dated = rows.filter((r) => r.plan.state === "onTime");
+    const need = dated.reduce((sum, r) => sum + r.plan.perMonth, 0);
+    const lead = dated.length > 1 ? { en: "Together that's", id: "Totalnya" } : { en: "That's", id: "Jumlahnya" };
+    const surplus = m?.monthlyIncome > 0 ? m.monthlyIncome - m.monthlyExpenses : null;
+    let fit = { en: "", id: "" };
+    if (need > 0 && surplus !== null) {
+      fit = surplus <= 0
+        ? { en: `\n\nYour goals need ${money(need)} a month, but your profile has no surplus left after expenses. Freeing up some spending comes first.`, id: `\n\nTujuanmu butuh ${money(need)} per bulan, tapi profilmu tidak punya sisa setelah pengeluaran. Kurangi dulu sebagian pengeluaran.` }
+        : need <= surplus
+          ? { en: `\n\n${lead.en} ${money(need)} a month, which fits within your ${money(surplus)} monthly surplus.`, id: `\n\n${lead.id} ${money(need)} per bulan, masih muat dalam sisa bulananmu sebesar ${money(surplus)}.` }
+          : { en: `\n\n${lead.en} ${money(need)} a month, more than your ${money(surplus)} monthly surplus. Moving a target date back or trimming spending would close the gap.`, id: `\n\n${lead.id} ${money(need)} per bulan, lebih besar dari sisa bulananmu sebesar ${money(surplus)}. Mundurkan salah satu tanggal target atau kurangi pengeluaran untuk menutup selisihnya.` };
+    }
+    return {
+      en: `Here's where your ${goals.length === 1 ? "goal stands" : "goals stand"}:\n${shown.map((x) => x.en).join("\n")}${more.en}${fit.en}`,
+      id: `Begini posisi tujuanmu:\n${shown.map((x) => x.id).join("\n")}${more.id}${fit.id}`,
+    };
+  },
+
+  // Payoff date for the debts on the Debt plan page (engine: src/debt.js).
+  debtplan(c) {
+    const { debts, money, lang, m, p } = c;
+    if (!debts.length) {
+      const owed = c.n(p.shortTermDebt) + c.n(p.longTermDebt);
+      return owed > 0
+        ? { en: `Your profile shows ${money(owed)} of debt, but the Debt plan page doesn't list the individual debts yet. Add each one there with its interest rate and minimum payment, and I'll tell you when you'll be debt-free.`, id: `Profilmu mencatat utang ${money(owed)}, tapi halaman Rencana utang belum berisi rincian utangnya. Tambahkan setiap utang beserta bunga dan cicilan minimumnya, lalu aku akan memberi tahu kapan kamu bebas utang.` }
+        : { en: `You haven't added any debts on the Debt plan page. If you have a credit card, pay-later or loan balance, add it there with its interest rate and minimum payment, and I'll work out your debt-free date.`, id: `Kamu belum menambahkan utang di halaman Rencana utang. Kalau punya saldo kartu kredit, paylater, atau pinjaman, tambahkan di sana beserta bunga dan cicilan minimumnya, lalu aku akan menghitung tanggal bebas utangmu.` };
+    }
+    const total = debts.reduce((sum, d) => sum + d.balance, 0);
+    const base = simulate(debts, { strategy: "minimum" });
+    const priciest = [...debts].sort((a, b) => b.rate - a.rate)[0];
+    const parts = [{
+      en: `You owe ${money(total)} across ${plural(debts.length, "debt")}, with ${money(totalMinimums(debts))} a month in minimum payments.`,
+      id: `Total utangmu ${money(total)} dari ${debts.length} utang, dengan cicilan minimum ${money(totalMinimums(debts))} per bulan.`,
+    }];
+
+    if (base.months === null) {
+      const stuck = stuckDebts(debts).map((d) => d.name).join(", ");
+      parts.push(stuck
+        ? { en: `On minimum payments alone you won't be debt-free: the minimum on ${stuck} doesn't even cover the monthly interest. Raising that payment comes first.`, id: `Dengan cicilan minimum saja kamu tidak akan bebas utang: cicilan minimum ${stuck} bahkan tidak menutup bunga bulanannya. Naikkan pembayaran itu lebih dulu.` }
+        : { en: `On minimum payments alone it would take more than 50 years to clear.`, id: `Dengan cicilan minimum saja butuh lebih dari 50 tahun untuk lunas.` });
+    } else {
+      parts.push({
+        en: `On minimums alone you'll be debt-free around ${monthsFromNow(base.months, lang)} (${plural(base.months, "month")})${base.totalInterest >= 1 ? `, paying ${money(base.totalInterest)} in interest along the way` : ""}.`,
+        id: `Dengan cicilan minimum saja kamu bebas utang sekitar ${monthsFromNow(base.months, lang)} (${base.months} bulan)${base.totalInterest >= 1 ? `, dengan total bunga ${money(base.totalInterest)}` : ""}.`,
+      });
+    }
+    if (debts.length > 1 && priciest.rate > 0) {
+      parts.push({
+        en: `Any extra money should go to ${priciest.name} first: at ${priciest.rate}% a year it's your most expensive debt.`,
+        id: `Uang lebih sebaiknya dipakai untuk ${priciest.name} dulu: dengan bunga ${priciest.rate}% per tahun, itu utang termahalmu.`,
+      });
+    }
+
+    if (!c.fullDebtPlan) {
+      parts.push({
+        en: `With Expert Standard or Pro, the Debt plan page compares the avalanche and snowball orders and shows what an extra monthly payment saves.`,
+        id: `Dengan Expert Standard atau Pro, halaman Rencana utang membandingkan urutan avalanche dan snowball serta menunjukkan penghematan dari pembayaran ekstra bulanan.`,
+      });
+    } else {
+      // A quarter of the monthly surplus as an example extra payment, in the page slider's 50,000 steps.
+      const surplus = m?.monthlyIncome > 0 ? m.monthlyIncome - m.monthlyExpenses : 0;
+      const extra = Math.max(0, Math.floor(surplus / 4 / 50000) * 50000);
+      const fast = simulate(debts, { strategy: "avalanche", extra });
+      const sooner = base.months === null ? null : base.months - (fast.months ?? Infinity);
+      const savedInterest = base.totalInterest - fast.totalInterest;
+      const how = extra > 0
+        ? { en: `Adding ${money(extra)} a month (about a quarter of your surplus)${debts.length > 1 ? " and paying the highest interest first" : ""}`, id: `Menambah ${money(extra)} per bulan (sekitar seperempat sisa bulananmu)${debts.length > 1 ? " dan melunasi bunga tertinggi lebih dulu" : ""}` }
+        : { en: `Paying the highest interest first and rolling each cleared minimum into the next debt`, id: `Melunasi bunga tertinggi lebih dulu dan mengalihkan cicilan utang yang sudah lunas ke utang berikutnya` };
+      if (fast.months === null) {
+        parts.push({ en: `${how.en} still wouldn't clear everything, so the payments need to go up.`, id: `${how.id} masih belum cukup untuk melunasi semuanya, jadi pembayarannya perlu dinaikkan.` });
+      } else if (sooner === null) {
+        parts.push({ en: `${how.en} would make you debt-free by ${monthsFromNow(fast.months, lang)}.`, id: `${how.id} akan membuatmu bebas utang pada ${monthsFromNow(fast.months, lang)}.` });
+      } else if (sooner > 0) {
+        parts.push({
+          en: `${how.en} gets you there by ${monthsFromNow(fast.months, lang)}: ${plural(sooner, "month")} sooner, saving ${money(savedInterest)} in interest. Try other amounts on the Debt plan page.`,
+          id: `${how.id} membuatmu lunas pada ${monthsFromNow(fast.months, lang)}: ${sooner} bulan lebih cepat dan hemat bunga ${money(savedInterest)}. Coba jumlah lain di halaman Rencana utang.`,
+        });
+      } else {
+        parts.push({ en: `Paying more than the minimum is what speeds this up. Try a few amounts on the Debt plan page.`, id: `Membayar lebih dari cicilan minimum adalah cara mempercepatnya. Coba beberapa jumlah di halaman Rencana utang.` });
+      }
+    }
+    return { en: parts.map((x) => x.en).join(" "), id: parts.map((x) => x.id).join(" ") };
+  },
+
+  // Booked expert sessions.
+  sessions(c) {
+    const { bookings, lang } = c;
+    const now = Date.now();
+    const upcoming = bookings
+      .filter((b) => b.status !== "cancelled" && b.startsAt + SESSION_MS > now)
+      .sort((a, b) => a.startsAt - b.startsAt);
+    if (!upcoming.length) {
+      return {
+        en: `You have no upcoming expert sessions. You can book one on the Experts page on any plan: sessions are paid per session, and Expert Standard and Pro include free ones every month.`,
+        id: `Kamu belum punya sesi expert yang akan datang. Kamu bisa memesannya di halaman Experts dengan paket apa pun: sesi dibayar per sesi, dan Expert Standard serta Pro mendapat sesi gratis setiap bulan.`,
+      };
+    }
+    const next = upcoming[0];
+    const type = c.t(next.typeLabel);
+    const when = new Date(next.startsAt).toLocaleString(locale(lang), { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+    const others = upcoming.length - 1;
+    const head = next.startsAt <= now
+      ? { en: `Your ${type} session with ${next.expertName} is happening now.`, id: `Sesi ${type} kamu dengan ${next.expertName} sedang berlangsung.` }
+      : { en: `Your next session is ${type} with ${next.expertName} on ${when}.`, id: `Sesi berikutnya: ${type} dengan ${next.expertName} pada ${when}.` };
+    const rest = others > 0
+      ? { en: ` You have ${plural(others, "more session")} booked after that.`, id: ` Setelah itu masih ada ${others} sesi lagi.` }
+      : { en: "", id: "" };
+    return {
+      en: `${head.en}${rest.en} You'll find it under My sessions on the Experts page, where you can also add it to your calendar.`,
+      id: `${head.id}${rest.id} Kamu bisa melihatnya di Sesiku pada halaman Experts, dan menambahkannya ke kalender dari sana.`,
     };
   },
 
@@ -217,8 +377,8 @@ const REPLIES = {
 
   greeting() {
     return {
-      en: `Hi! Ask me about your savings rate, emergency fund, debt, net worth, budget or FIRE date, or tap one of the suggestions below.`,
-      id: `Hai! Tanyakan soal tingkat tabungan, dana darurat, utang, kekayaan bersih, anggaran, atau tanggal FIRE kamu, atau ketuk salah satu saran di bawah.`,
+      en: `Hi! Ask me about your savings rate, emergency fund, debt, goals, upcoming sessions, net worth, budget or FIRE date, or tap one of the suggestions below.`,
+      id: `Hai! Tanyakan soal tingkat tabungan, dana darurat, utang, tujuan tabungan, sesi expert, kekayaan bersih, anggaran, atau tanggal FIRE kamu, atau ketuk salah satu saran di bawah.`,
     };
   },
 
@@ -228,8 +388,8 @@ const REPLIES = {
 
   unknown() {
     return {
-      en: `I'm a rule-based coach, so I can only answer questions about your own numbers: savings rate, emergency fund, debt (DTI), net worth, budget, income and your FIRE date. Try asking about one of those. For anything else, an expert session is the best route.`,
-      id: `Aku coach berbasis aturan, jadi aku hanya bisa menjawab pertanyaan tentang angka keuanganmu sendiri: tingkat tabungan, dana darurat, utang (DTI), kekayaan bersih, anggaran, pendapatan, dan tanggal FIRE. Coba tanyakan salah satunya. Untuk hal lain, sesi dengan expert adalah pilihan terbaik.`,
+      en: `I'm a rule-based coach, so I can only answer questions about your own numbers: savings rate, emergency fund, debt (DTI) and your debt-free date, savings goals, booked sessions, net worth, budget, income and your FIRE date. Try asking about one of those. For anything else, an expert session is the best route.`,
+      id: `Aku coach berbasis aturan, jadi aku hanya bisa menjawab pertanyaan tentang angka keuanganmu sendiri: tingkat tabungan, dana darurat, utang (DTI) dan tanggal bebas utang, tujuan tabungan, sesi yang dipesan, kekayaan bersih, anggaran, pendapatan, dan tanggal FIRE. Coba tanyakan salah satunya. Untuk hal lain, sesi dengan expert adalah pilihan terbaik.`,
     };
   },
 
@@ -246,12 +406,12 @@ const NEEDS_NUMBERS = new Set(["savings", "emergency", "debt", "fire", "networth
 /**
  * Reply to one message.
  * @param {string} text - what the user typed (ignored when `topic` is given)
- * @param {object} ctx - { profile, metrics, fireData, lang, money, fmt, topic? }
+ * @param {object} ctx - { profile, metrics, fireData, goals, debts, bookings, fullDebtPlan, lang, t, money, fmt, topic? }
  */
-export function coachReply(text, { profile, metrics, fireData, lang, money, fmt, topic }) {
+export function coachReply(text, { profile, metrics, fireData, goals = [], debts = [], bookings = [], fullDebtPlan = false, lang, t = (s) => s, money, fmt, topic }) {
   let key = topic ?? detectTopic(text);
   if (NEEDS_NUMBERS.has(key) && !(metrics?.monthlyIncome > 0)) key = "noProfile";
   const n = (v) => { const x = typeof v === "number" ? v : parseFloat(v); return Number.isFinite(x) ? x : 0; };
-  const reply = REPLIES[key]({ m: metrics, f: fireData, p: profile ?? {}, money, fmt, n });
+  const reply = REPLIES[key]({ m: metrics, f: fireData, p: profile ?? {}, goals, debts, bookings, fullDebtPlan, lang, t, money, fmt, n });
   return lang === "id" ? reply.id : reply.en;
 }

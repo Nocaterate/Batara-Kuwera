@@ -52,14 +52,13 @@ export const annualPrice = (monthly) => Math.round((monthly * 12 * (1 - ANNUAL_D
 export const normalizeBookings = (list) =>
   Array.isArray(list) ? list.filter((b) => b && typeof b.startsAt === "number" && typeof b.reference === "string") : [];
 
-// Each suggestion goes straight to a coach topic (src/coach.js).
-// Savings goals saved on the account (see src/Goals.jsx).
 // Debts for the Debt plan page (see src/debt.js): { id, name, balance, rate, minPayment }.
 export const normalizeDebts = (list) =>
   Array.isArray(list)
     ? list.filter((d) => d && typeof d.id === "string" && typeof d.name === "string" && d.balance > 0 && d.minPayment > 0 && d.rate >= 0)
     : [];
 
+// Savings goals saved on the account (see src/Goals.jsx).
 export const normalizeGoals = (list) =>
   Array.isArray(list)
     ? list.filter((g) => g && typeof g.id === "string" && typeof g.name === "string" && g.target > 0)

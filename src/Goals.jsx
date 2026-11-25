@@ -4,28 +4,17 @@ import { useLang } from "./i18n.js";
 import { cn } from "./ui.js";
 import { AmountField } from "./components/fields.jsx";
 import Confetti from "./components/Confetti.jsx";
+import { goalSaved, goalPlan } from "./goals.js";
 
 /* Savings goals. A goal is { id, name, target, targetDate (timestamp or null), deposits: [{ amount, at }], createdAt },
  * saved on the account. Progress comes from manual deposits ("Add savings"). */
 
-const MONTH_MS = 30.44 * 24 * 60 * 60 * 1000;
-export const goalSaved = (g) => g.deposits.reduce((sum, d) => sum + d.amount, 0);
 const isDone = (g) => goalSaved(g) >= g.target;
 const newId = () => "goal-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // <input type="date"> uses "YYYY-MM-DD"; a goal's date counts until the end of that day.
 const toDateInput = (ts) => { if (!ts) return ""; const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const fromDateInput = (s) => { if (!s) return null; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d, 23, 59, 59).getTime(); };
-
-// What it takes to finish on time: { state: "done" | "late" | "onTime" | "noDate", perMonth, months }
-export function goalPlan(g, now = Date.now()) {
-  const left = Math.max(0, g.target - goalSaved(g));
-  if (left === 0) return { state: "done" };
-  if (!g.targetDate) return { state: "noDate" };
-  if (g.targetDate < now) return { state: "late" };
-  const months = Math.max(1, Math.ceil((g.targetDate - now) / MONTH_MS));
-  return { state: "onTime", months, perMonth: Math.ceil(left / months / 1000) * 1000 };
-}
 
 function ProgressBar({ value, done }) {
   return (

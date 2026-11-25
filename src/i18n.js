@@ -316,7 +316,7 @@ const ID = {
   "Smart Coach": "Smart Coach",
   "Unlimited Smart Coach chat": "Chat Smart Coach tanpa batas",
   "Guidance built from the numbers in your financial profile.": "Panduan yang disusun dari angka di profil keuanganmu.",
-  "Hi, I'm your Batara Kuwera Smart Coach. Ask me about your savings, emergency fund, debt, net worth, budget or FIRE date, or pick a suggestion below.": "Hai, aku Smart Coach Batara Kuwera. Tanyakan soal tabungan, dana darurat, utang, kekayaan bersih, anggaran, atau tanggal FIRE kamu, atau pilih saran di bawah.",
+  "Hi, I'm your Batara Kuwera Smart Coach. Ask me about your savings, debt, goals, upcoming sessions or FIRE date, or pick a suggestion below.": "Hai, aku Smart Coach Batara Kuwera. Tanyakan soal tabungan, utang, tujuan tabungan, sesi expert, atau tanggal FIRE kamu, atau pilih saran di bawah.",
   "How healthy are my finances overall?": "Seberapa sehat keuanganku secara keseluruhan?",
   "Find an expert": "Cari expert",
   "My sessions": "Sesiku",
@@ -429,6 +429,9 @@ const ID = {
   // Smart Coach
   "thinking…": "berpikir…",
   "How can I improve my savings rate?": "Bagaimana cara meningkatkan rasio tabunganku?",
+  "How are my goals going?": "Bagaimana perkembangan tujuanku?",
+  "When will I be debt-free?": "Kapan aku bebas utang?",
+  "When is my next session?": "Kapan sesi berikutnya?",
   "Explain my financial freedom date": "Jelaskan tanggal kebebasan finansialku",
   "What's a healthy emergency fund for me?": "Berapa dana darurat yang sehat untukku?",
   "Break down my DTI ratio": "Jelaskan rasio DTI-ku",

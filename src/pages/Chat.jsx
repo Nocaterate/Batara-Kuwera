@@ -13,10 +13,18 @@ const PROMPT_SUGGESTIONS = [
   { label: "How healthy are my finances overall?", topic: "health" },
 ];
 
-// Smart Coach: answers come from src/coach.js, built from the user's own numbers.
+// Shown ahead of the usual suggestions when the user has goals, debts or upcoming sessions.
+const DATA_SUGGESTIONS = [
+  { label: "How are my goals going?", topic: "goals", has: ({ goals }) => goals.length > 0 },
+  { label: "When will I be debt-free?", topic: "debtplan", has: ({ debts }) => debts.length > 0 },
+  { label: "When is my next session?", topic: "sessions", has: ({ bookings }) => bookings.some((b) => b.status !== "cancelled" && b.startsAt > Date.now()) },
+];
+
+// Smart Coach: answers come from src/coach.js, built from the user's own numbers, goals, debts and sessions.
 // No AI service or network involved, so it works anywhere and has no usage limit.
-export function ChatPage({ profile, metrics, fireData, T }) {
+export function ChatPage({ profile, metrics, fireData, goals = [], debts = [], bookings = [], fullDebtPlan = false, T }) {
   const { t, lang, money, fmt } = useLang();
+  const suggestions = [...DATA_SUGGESTIONS.filter((s) => s.has({ goals, debts, bookings })), ...PROMPT_SUGGESTIONS];
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,7 +41,7 @@ export function ChatPage({ profile, metrics, fireData, T }) {
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
     setLoading(true);
-    const reply = coachReply(text, { profile, metrics, fireData, lang, money, fmt, topic });
+    const reply = coachReply(text, { profile, metrics, fireData, goals, debts, bookings, fullDebtPlan, lang, t, money, fmt, topic });
     // A short pause so the reply doesn't appear in the same instant as the question.
     timerRef.current = window.setTimeout(() => {
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
@@ -51,7 +59,7 @@ export function ChatPage({ profile, metrics, fireData, T }) {
       <div className={cn("mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl border p-4", T.panel, T.cardBorder)} style={{ minHeight: 320, maxHeight: 460 }}>
         <div className="flex justify-start">
           <div style={{ maxWidth: "85%" }} className={cn("whitespace-pre-wrap rounded-2xl border px-3.5 py-2.5 text-sm", T.border, T.text)}>
-            {t("Hi, I'm your Batara Kuwera Smart Coach. Ask me about your savings, emergency fund, debt, net worth, budget or FIRE date, or pick a suggestion below.")}
+            {t("Hi, I'm your Batara Kuwera Smart Coach. Ask me about your savings, debt, goals, upcoming sessions or FIRE date, or pick a suggestion below.")}
           </div>
         </div>
         {messages.map((m, i) => (
@@ -78,7 +86,7 @@ export function ChatPage({ profile, metrics, fireData, T }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {PROMPT_SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <button key={s.label} onClick={() => send(t(s.label), s.topic)} disabled={loading} className={cn("rounded-full border px-3 py-1.5 text-xs transition-colors", T.border, T.subtext, T.hoverBg)}>
             {t(s.label)}
           </button>
