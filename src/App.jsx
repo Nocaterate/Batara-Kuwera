@@ -7,7 +7,7 @@ import { AppShell } from "./AppShell.jsx";
 import { Toast } from "./components/common.jsx";
 import { emptyProfile, computeMetrics, computeFireProjection } from "./finance.js";
 import { LoginPage, RegisterPage } from "./pages/Auth.jsx";
-import { TIERS, perksFor, FREE_SUBSCRIPTION, normalizeSubscription, normalizeBookings, normalizeGoals } from "./plans.js";
+import { TIERS, perksFor, FREE_SUBSCRIPTION, normalizeSubscription, normalizeBookings, normalizeGoals, normalizeDebts } from "./plans.js";
 import { DARK_TOKENS, LIGHT_TOKENS } from "./theme.js";
 
 // Pages load on first visit, so the login screen doesn't download charts, checkout or the PDF code.
@@ -15,6 +15,7 @@ const named = (load, name) => lazy(() => load().then((m) => ({ default: m[name] 
 const OnboardingPage = named(() => import("./pages/Onboarding.jsx"), "OnboardingPage");
 const DashboardPage = named(() => import("./pages/Dashboard.jsx"), "DashboardPage");
 const GoalsPage = lazy(() => import("./Goals.jsx"));
+const DebtsPage = named(() => import("./pages/Debts.jsx"), "DebtsPage");
 const ExpertsPage = named(() => import("./pages/Experts.jsx"), "ExpertsPage");
 const SubscriptionPage = named(() => import("./pages/Subscription.jsx"), "SubscriptionPage");
 const SettingsPage = named(() => import("./pages/Settings.jsx"), "SettingsPage");
@@ -55,6 +56,7 @@ function loadInitialState() {
     subscription: normalizeSubscription(account.subscription),
     bookings: normalizeBookings(account.bookings),
     goals: normalizeGoals(account.goals),
+    debts: normalizeDebts(account.debts),
     theme: ["dark", "light", "system"].includes(prefs.theme) ? prefs.theme : "dark",
     lang: LANGUAGES.some((l) => l.id === prefs.lang) ? prefs.lang : "en",
   };
@@ -73,6 +75,7 @@ export default function App() {
   const [subscription, setSubscription] = useState(init.subscription);
   const [bookings, setBookings] = useState(init.bookings);
   const [goals, setGoals] = useState(init.goals);
+  const [debts, setDebts] = useState(init.debts);
   const [toast, setToast] = useState(null);
   // Which Experts tab to open next; set by the dashboard card, reset by the sidebar.
   const [expertsTab, setExpertsTab] = useState("find");
@@ -96,8 +99,8 @@ export default function App() {
   }, [theme, lang]);
 
   useEffect(() => {
-    if (session) saveAccount(session.email, { user, profile, hasProfile, subscription, bookings, goals });
-  }, [session, user, profile, hasProfile, subscription, bookings, goals]);
+    if (session) saveAccount(session.email, { user, profile, hasProfile, subscription, bookings, goals, debts });
+  }, [session, user, profile, hasProfile, subscription, bookings, goals, debts]);
 
   const resetAccountState = () => {
     setUser({ fullName: "", email: "" });
@@ -106,6 +109,7 @@ export default function App() {
     setSubscription(FREE_SUBSCRIPTION);
     setBookings([]);
     setGoals([]);
+    setDebts([]);
   };
 
   // When a paid plan reaches its due date the account drops back to the free plan.
@@ -166,6 +170,7 @@ export default function App() {
     setSubscription(normalizeSubscription(account.subscription));
     setBookings(normalizeBookings(account.bookings));
     setGoals(normalizeGoals(account.goals));
+    setDebts(normalizeDebts(account.debts));
     setSession(startSession(result.email, remember));
     if (account.hasProfile) {
       setPage("dashboard");
@@ -216,7 +221,7 @@ export default function App() {
     setPage("login");
   };
 
-  const AUTHED_PAGES = ["dashboard", "goals", "experts", "subscription", "settings", "chat"];
+  const AUTHED_PAGES = ["dashboard", "goals", "debts", "experts", "subscription", "settings", "chat"];
 
   // Paint the page itself (not just the app) so refresh and overscroll never flash white.
   // Login, register and onboarding are always dark; only the signed-in pages follow the theme.
@@ -251,6 +256,12 @@ export default function App() {
             <GoalsPage
               goals={goals} setGoals={setGoals} maxGoals={perksFor(subscription.tier).maxGoals}
               monthlySurplus={metrics.monthlyIncome - metrics.monthlyExpenses} setPage={setPage} showToast={showToast} T={T}
+            />
+          )}
+          {page === "debts" && (
+            <DebtsPage
+              debts={debts} setDebts={setDebts} monthlySurplus={metrics.monthlyIncome - metrics.monthlyExpenses}
+              fullAccess={perksFor(subscription.tier).fullDebtPlan} setPage={setPage} showToast={showToast} T={T}
             />
           )}
           {page === "experts" && <ExpertsPage key={expertsTab} initialTab={expertsTab} subscriptionTier={subscription.tier} bookings={bookings} setBookings={setBookings} showToast={showToast} setPage={setPage} T={T} />}

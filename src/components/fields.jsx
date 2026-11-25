@@ -75,7 +75,7 @@ export function InfoTip({ label, text, T }) {
   );
 }
 
-function FieldLabel({ id, label, info, T }) {
+export function FieldLabel({ id, label, info, T }) {
   const { t } = useLang();
   return (
     <div className="mb-1.5 flex items-center gap-1.5">

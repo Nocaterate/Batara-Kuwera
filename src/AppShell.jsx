@@ -1,5 +1,5 @@
 // Signed-in layout: sidebar navigation and top bar.
-import { Shield, LayoutDashboard, Users, Settings as SettingsIcon, MessageSquare, LogOut, Menu, Target } from "lucide-react";
+import { Shield, LayoutDashboard, Users, Settings as SettingsIcon, MessageSquare, LogOut, Menu, Target, CreditCard } from "lucide-react";
 import { useLang } from "./i18n.js";
 import { cn } from "./ui.js";
 import KawungLayer from "./components/KawungLayer.jsx";
@@ -9,6 +9,7 @@ import { LOGO_SRC } from "./theme.js";
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "goals", label: "Goals", icon: Target },
+  { id: "debts", label: "Debt plan", icon: CreditCard },
   { id: "experts", label: "Experts", icon: Users },
   { id: "subscription", label: "Subscription", icon: Shield },
   { id: "chat", label: "Smart Coach", icon: MessageSquare },
