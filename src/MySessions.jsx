@@ -5,6 +5,7 @@ import Modal from "./Modal.jsx";
 import Avatar from "./Avatar.jsx";
 import { SESSION_MINUTES } from "./Schedule.jsx";
 import { cn } from "./ui.js";
+import AddToCalendar from "./components/AddToCalendar.jsx";
 
 // Cancelling more than `refundHours` before the start refunds the payment (or returns the free
 // monthly session); later than that the session can still be cancelled, but isn't refunded.
@@ -65,7 +66,8 @@ function SessionRow({ booking, photo, now, onCancel, T }) {
         </div>
       </div>
       {cancellable && (
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <AddToCalendar booking={booking} T={T} />
           <button type="button" onClick={() => onCancel(booking)} className={cn("rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors", T.dangerBorder, T.accent, T.dangerHover)}>
             {t("Cancel session")}
           </button>

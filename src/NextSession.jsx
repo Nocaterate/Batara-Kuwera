@@ -4,6 +4,7 @@ import { useLang } from "./i18n.js";
 import Avatar from "./Avatar.jsx";
 import { SESSION_MINUTES } from "./Schedule.jsx";
 import { cn } from "./ui.js";
+import AddToCalendar from "./components/AddToCalendar.jsx";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const startOfDay = (ts) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -33,12 +34,10 @@ export default function NextSessionCard({ bookings, photoFor, onOpen, T }) {
   if (upcoming.length === 0) return null;
   const next = upcoming[0];
 
+  // The card opens My sessions; the calendar buttons sit beside that button (buttons can't be nested).
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn("group flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition-colors hover:border-red-600", T.panel, T.cardBorder)}
-    >
+    <div className={cn("group flex w-full items-center gap-3 rounded-2xl border p-4 transition-colors hover:border-red-600", T.panel, T.cardBorder)}>
+    <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-4 text-left">
       <Avatar name={next.expertName} photo={photoFor(next.expertId)} size={44} T={T} />
       <div className="min-w-0 flex-1">
         <div className={cn("flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider", T.accent)}>
@@ -48,7 +47,11 @@ export default function NextSessionCard({ bookings, photoFor, onOpen, T }) {
         <div className={cn("truncate text-sm font-semibold", T.text)}>{t("{type} with {name}", { type: t(next.typeLabel), name: next.expertName })}</div>
         <div className={cn("text-xs", T.subtext)}>{whenLabel(next.startsAt, now, t, lang)}</div>
       </div>
-      <ChevronRight size={18} className={cn("shrink-0 transition-transform group-hover:translate-x-0.5", T.mutedText)} />
     </button>
+    {next.startsAt > now && <AddToCalendar booking={next} compact T={T} />}
+    <button type="button" onClick={onOpen} aria-label={t("My sessions")} className={cn("shrink-0", T.mutedText)}>
+      <ChevronRight size={18} className="transition-transform group-hover:translate-x-0.5" />
+    </button>
+    </div>
   );
 }
